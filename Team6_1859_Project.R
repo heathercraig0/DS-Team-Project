@@ -18,5 +18,13 @@ colnames(key_variables) <- c("PSQI", "Epworth", "Stanford", "AIS", "SF36_PCS", "
 colSums(is.na(key_variables))
 
 # Checking levels for categorical variables with <2 levels
+write.csv(key_variables, "key_variables.csv", row.names = FALSE)
 
 
+# Converting continuous sleep deprevation tests to categorical (sleep deprevation = 1) 
+
+# Derived variables 
+
+#total number of tests
+
+#
