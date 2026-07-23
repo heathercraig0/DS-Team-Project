@@ -13,7 +13,7 @@ key_variables<- given_data[c("Pittsburgh.Sleep.Quality.Index.Score","Epworth.Sle
 
 # Renaming column names
 colnames(key_variables) <- c("PSQI", "ESS", "BSS", "AIS", "SF36_PCS", "SF36_MCS"," Age", "Gender", "BMI", "TransplantTime", "LiverDiagnosis", "DiseaseRecurrence",  "Rejection", "Fibrosis", "RenalFailure", "Depression", "Corticosteroid")
-write.csv(key_variables, "key_variables")
+
 
 # Derived Variables
 #converting PSQI (score of 4+), ESS (10+) and AIS (5+) to binary (sleep disturbance =1)
@@ -21,6 +21,7 @@ write.csv(key_variables, "key_variables")
 
 # Checking missing data
 colSums(is.na(key_variables))
+
 
 
 
