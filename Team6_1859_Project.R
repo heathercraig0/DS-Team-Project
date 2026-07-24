@@ -22,8 +22,6 @@ key_variables$ESS_binary <- ifelse(key_variables$ESS > 10, 1, 0)
 key_variables$AIS_binary <- ifelse(key_variables$AIS > 5, 1, 0)
 
 
-
-
 # Checking total counts
 sleep_counts <- data.frame(
   Variable = c("PSQI", "AIS", "ESS", "BSS"),
@@ -66,5 +64,3 @@ print(sleep_counts)
 
 
 write.csv(key_variables, "key_variables.csv", row.names = FALSE)
-
-
