@@ -256,7 +256,6 @@ nobs(model_BSS)
 # ----------------------------------------------------------------------------
 # Summary table: predictor significance/direction across the 4 sleep models
 # Rows = predictors, columns = estimate + p-value per instrument
-# (Intercept excluded - it isn't a predictor)
 # ----------------------------------------------------------------------------
 
 # Pull the coefficient tables out of each model's summary()
