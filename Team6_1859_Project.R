@@ -75,6 +75,89 @@ sleep_counts <- rbind(
 print(sleep_counts)
 
 
+# ------------------------------------------------------------------------------
+# Description of relevant data
+# ------------------------------------------------------------------------------
+continuous_vars <- c("Age", "BMI", "TransplantTime", "SF36_PCS", "SF36_MCS", 
+                     "PSQI", "ESS", "AIS")
+
+# empty vectors to collect results from each loop iteration
+mean_vals   <- c()
+sd_vals     <- c()
+median_vals <- c()
+iqr_vals    <- c()
+na_vals     <- c()
+
+for (v in continuous_vars) {
+  x <- key_variables[[v]]   # pull out the column by name
+  mean_vals   <- c(mean_vals,   mean(x, na.rm = TRUE))
+  sd_vals     <- c(sd_vals,     sd(x, na.rm = TRUE))
+  median_vals <- c(median_vals, median(x, na.rm = TRUE))
+  iqr_vals    <- c(iqr_vals,    IQR(x, na.rm = TRUE))
+  na_vals     <- c(na_vals,     sum(is.na(x)))
+}
+
+continuous_summary <- data.frame(
+  Variable = continuous_vars,
+  Mean     = round(mean_vals, 2),
+  SD       = round(sd_vals, 2),
+  Median   = round(median_vals, 2),
+  IQR      = round(iqr_vals, 2),
+  Missing  = na_vals,
+  N_valid  = nrow(key_variables) - na_vals
+)
+
+print(continuous_summary)
+
+# Define the labels for each categorical variable
+# (names match the actual numeric codes in the data, as text)
+labels_list <- list(
+  Gender             = c("1" = "Male", "2" = "Female"),
+  LiverDiagnosis     = c("1" = "Hepatitis C", "2" = "Hepatitis B", "3" = 
+                           "PSC/PBC/AIH",
+                         "4" = "Alcohol-related", "5" = "Other/heterogeneous"),
+  DiseaseRecurrence  = c("0" = "No", "1" = "Yes"),
+  Rejection          = c("0" = "No", "1" = "Yes"),
+  Fibrosis           = c("0" = "No", "1" = "Yes"),
+  RenalFailure       = c("0" = "No", "1" = "Yes"),
+  Depression         = c("0" = "No", "1" = "Yes"),
+  Corticosteroid     = c("0" = "No", "1" = "Yes"),
+  BSS                = c("0" = "Negative", "1" = "Positive")
+)
+
+categorical_vars <- names(labels_list)
+
+# empty data frame to build up row by row across all variables
+categorical_summary <- data.frame(Variable = character(),
+                                  Category = character(),
+                                  n = integer(),
+                                  Percent = numeric(),
+                                  stringsAsFactors = FALSE)
+
+for (v in categorical_vars) {
+  x <- key_variables[[v]]
+  
+  counts <- table(x)                          # valid (non-missing) counts only
+  pct    <- round(prop.table(counts) * 100, 1)
+  
+  # translate the numeric codes (as text) into labels using the lookup above
+  category_labels <- labels_list[[v]][names(counts)]
+  
+  # build this variable's rows
+  var_rows <- data.frame(
+    Variable = c(v, rep("", length(counts) - 1)),  # only show variable name once
+    Category = category_labels,
+    n        = as.integer(counts),
+    Percent  = as.numeric(pct),
+    stringsAsFactors = FALSE
+  )
+  
+  categorical_summary <- rbind(categorical_summary, var_rows)
+}
+
+print(categorical_summary)
+
+
 # ----------------------------------------------------------------------------
 # Individual prevalence for each of the 4 sleep instruments
 # ----------------------------------------------------------------------------
