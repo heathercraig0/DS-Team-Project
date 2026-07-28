@@ -74,6 +74,10 @@ sleep_counts <- rbind(
 
 print(sleep_counts)
 
+# ------------------------------------------------------------------------------
+# Data Quality Checks 
+# ------------------------------------------------------------------------------
+summary(key_variables)
 
 # ------------------------------------------------------------------------------
 # Description of relevant data
@@ -161,7 +165,7 @@ print(categorical_summary)
 # ----------------------------------------------------------------------------
 # Individual prevalence for each of the 4 sleep instruments
 # ----------------------------------------------------------------------------
-# Denominator = No + Yes (i.e. Not Total sinceMissing is excluded from the 
+# Denominator = No + Yes (i.e. Not Total since Missing is excluded from the 
 # denominator)
 # Using binom.test() for 95% CI.
 
@@ -214,7 +218,7 @@ print(prevalence_table)
 # Overall (composite) prevalence: subject classified as "disturbed" if
 # >=50% of their COMPLETED sleep instruments flagged disturbance.
 # Denominator per subject = number of instruments they actually completed
-# (missing instruments are excluded, not counted as "not disturbed").
+# (missing instruments are excluded, not counted as "not disturb0ed").
 # ----------------------------------------------------------------------------
 
 # Pull the 4 binary sleep flags together (BSS is already binary, no _binary suffix)
@@ -292,87 +296,148 @@ key_variables$Corticosteroid <- factor(key_variables$Corticosteroid,
 
 
 # ----------------------------------------------------------------------------
-# Model 1: PSQI (continuous outcome) - linear regression
+# PSQI Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
-model_PSQI <- lm(PSQI ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
+library(MASS)
+# Removing missing data 
+PSQI_data <- na.omit(key_variables[, c(
+  "PSQI",
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)])
+# Full model creation 
+model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
                    DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
                    Depression + Corticosteroid,
-                 data = key_variables)
-summary(model_PSQI)
-
-# ----------------------------------------------------------------------------
-# Model 2: ESS (continuous outcome) - linear regression
-# ----------------------------------------------------------------------------
-model_ESS <- lm(ESS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
-                  DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
-                  Depression + Corticosteroid,
-                data = key_variables)
-summary(model_ESS)
-
-# ----------------------------------------------------------------------------
-# Model 3: AIS (continuous outcome) - linear regression
-# ----------------------------------------------------------------------------
-model_AIS <- lm(AIS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
-                  DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
-                  Depression + Corticosteroid,
-                data = key_variables)
-summary(model_AIS)
-
-# ----------------------------------------------------------------------------
-# Model 4: BSS (binary outcome, already 0/1) - logistic regression
-# ----------------------------------------------------------------------------
-model_BSS <- glm(BSS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
-                   DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
-                   Depression + Corticosteroid,
-                 data = key_variables, family = binomial)
-summary(model_BSS)
-
-# ----------------------------------------------------------------------------
-# Check actual sample size used per model (varies due to NAs in
-# outcome and predictors - each model drops its own incomplete cases)
-# ----------------------------------------------------------------------------
-nobs(model_PSQI)
-nobs(model_ESS)
-nobs(model_AIS)
-nobs(model_BSS)
-
-# ----------------------------------------------------------------------------
-# Summary table: predictor significance/direction across the 4 sleep models
-# Rows = predictors, columns = estimate + p-value per instrument
-# ----------------------------------------------------------------------------
-
-# Pull the coefficient tables out of each model's summary()
-psqi_coef <- summary(model_PSQI)$coefficients
-ess_coef  <- summary(model_ESS)$coefficients
-ais_coef  <- summary(model_AIS)$coefficients
-bss_coef  <- summary(model_BSS)$coefficients
-
-# All four models use the same formula/predictors, so row names line up -
-# use PSQI's rows as the reference list, minus the intercept
-predictor_names <- rownames(psqi_coef)
-predictor_names <- predictor_names[predictor_names != "(Intercept)"]
-
-# Build the combined table, matching each predictor by name (not position)
-# in case any model handles a factor level slightly differently
-results_table <- data.frame(
-  Predictor      = predictor_names,
-  PSQI_Estimate  = round(psqi_coef[predictor_names, "Estimate"], 3),
-  PSQI_p         = round(psqi_coef[predictor_names, "Pr(>|t|)"], 3),
-  ESS_Estimate   = round(ess_coef[predictor_names, "Estimate"], 3),
-  ESS_p          = round(ess_coef[predictor_names, "Pr(>|t|)"], 3),
-  AIS_Estimate   = round(ais_coef[predictor_names, "Estimate"], 3),
-  AIS_p          = round(ais_coef[predictor_names, "Pr(>|t|)"], 3),
-  BSS_OR         = round(exp(bss_coef[predictor_names, "Estimate"]), 3),  
-  BSS_p          = round(bss_coef[predictor_names, "Pr(>|z|)"], 3)
+                 data = PSQI_data)
+# Stepback best model generation 
+PSQI_stepback_model <- stepAIC(
+  model_PSQI_full,
+  direction = "backward",
+  trace = FALSE
 )
+summary(PSQI_stepback_model)
 
-# Add a significance flag per instrument (cutoff = 0.05)
-results_table$PSQI_sig <- ifelse(results_table$PSQI_p < 0.05, "Yes", "No")
-results_table$ESS_sig  <- ifelse(results_table$ESS_p  < 0.05, "Yes", "No")
-results_table$AIS_sig  <- ifelse(results_table$AIS_p  < 0.05, "Yes", "No")
-results_table$BSS_sig  <- ifelse(results_table$BSS_p  < 0.05, "Yes", "No")
+# ----------------------------------------------------------------------------
+# ESS Model  - Linear Regression w Stepwise Backward Model Selection
+# ----------------------------------------------------------------------------
+ESS_data <- na.omit(key_variables[, c(
+  "ESS",
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)])
+model_ESS_full <- lm(ESS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
+                  DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
+                  Depression + Corticosteroid,
+                data = ESS_data)
+ESS_stepback_model <- stepAIC(
+  model_ESS_full,
+  direction = "backward",
+  trace = FALSE
+)
+summary(ESS_stepback_model)
 
-print(results_table)
+# ----------------------------------------------------------------------------
+# AIS Model  - Linear Regression w Stepwise Backward Model Selection
+# ----------------------------------------------------------------------------
+AIS_data <- na.omit(key_variables[, c(
+  "AIS",
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)])
+model_AIS_full <- lm(AIS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
+                  DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
+                  Depression + Corticosteroid,
+                data = AIS_data)
+AIS_stepback_model <- stepAIC(
+  model_AIS_full,
+  direction = "backward",
+  trace = FALSE
+)
+summary(AIS_stepback_model)
 
+# ----------------------------------------------------------------------------
+# BSS Model  - Logistic Regression w Stepwise Backward Model Selection
+# ----------------------------------------------------------------------------
+BSS_data <- na.omit(key_variables[, c(
+  "BSS",
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)])
+model_BSS_full <- glm(BSS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
+                   DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
+                   Depression + Corticosteroid,
+                 data = BSS_data, family = binomial)
+BSS_stepback_model <- stepAIC(
+  model_BSS_full,
+  direction = "backward",
+  trace = FALSE
+)
+summary(BSS_stepback_model)
+
+# ----------------------------------------------------------------------------
+# Finding sample size used per model (after missing data was ommitted)
+# ----------------------------------------------------------------------------
+nrow(PSQI_data)
+nrow(ESS_data)
+nrow(AIS_data)
+nrow(BSS_data)
+
+# ----------------------------------------------------------------------------
+# Summary: predictor significance/direction across the 4 sleep models
+# ----------------------------------------------------------------------------
+
+# Pull coefficient tables from each final model's summary()
+psqi_coef <- summary(PSQI_stepback_model)$coefficients
+psqi_coef <- round(summary(PSQI_stepback_model)$coefficients, 3)
+print(psqi_coef)
+
+ess_coef  <- summary(ESS_stepback_model)$coefficients
+ess_coef <- round(summary(ESS_stepback_model)$coefficients, 3)
+print(ess_coef)
+
+ais_coef  <- summary(AIS_stepback_model)$coefficients
+ais_coef <- round(summary(AIS_stepback_model)$coefficients, 3)
+print(ais_coef)
+
+bss_coef  <- summary(BSS_stepback_model)$coefficients
+bss_or <- exp(coef(BSS_stepback_model))
+print(round(bss_or, 3))
 
 write.csv(key_variables, "key_variables.csv", row.names = FALSE)
