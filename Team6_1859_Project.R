@@ -412,6 +412,42 @@ BSS_stepback_model <- stepAIC(
 summary(BSS_stepback_model)
 
 # ----------------------------------------------------------------------------
+# Overall Disturbance Model  - Logistic Regression w Stepwise Backward Model Selection
+# ----------------------------------------------------------------------------
+Composite_data <- na.omit(key_variables[, c(
+  "Sleep_disturbed_composite",
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)])
+
+model_Composite_full <- glm(
+  Sleep_disturbed_composite ~ Age + Gender + BMI + TransplantTime + 
+    LiverDiagnosis + DiseaseRecurrence + Rejection + Fibrosis + 
+    RenalFailure + Depression + Corticosteroid,
+  data = Composite_data,
+  family = binomial
+)
+
+Composite_stepback_model <- stepAIC(
+  model_Composite_full,
+  direction = "backward",
+  trace = FALSE
+)
+
+summary(Composite_stepback_model)
+
+round(exp(coef(Composite_stepback_model)), 3)
+
+# ----------------------------------------------------------------------------
 # Finding sample size used per model (after missing data was ommitted)
 # ----------------------------------------------------------------------------
 nrow(PSQI_data)
