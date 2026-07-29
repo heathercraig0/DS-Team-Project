@@ -1,14 +1,18 @@
 #Data Science 1859 Team Project
 #Team 6 - Heather Craig, Amanda Illeperuma, Edward Li & Jayati Mishra
 
+# ------------------------------------------------------------------------------
 # Reading in data and basic info
+# ------------------------------------------------------------------------------
 given_data <- read.csv("project_data.csv")
 head(given_data)
 summary(given_data)
 dim(given_data)
 colnames(given_data)
 
+# ------------------------------------------------------------------------------
 # Making new DF with only variables of interest
+# ------------------------------------------------------------------------------
 key_variables<- given_data[c("Subject","Pittsburgh.Sleep.Quality.Index.Score",
                              "Epworth.Sleepiness.Scale", 
                              "Berlin.Sleepiness.Scale","Athens.Insomnia.Scale",
@@ -25,10 +29,10 @@ colnames(key_variables) <- c("Subject","PSQI", "ESS", "BSS", "AIS", "SF36_PCS",
                              "Fibrosis", "RenalFailure", "Depression", 
                              "Corticosteroid")
 
-
+# ------------------------------------------------------------------------------
 # Derived Variables
-# converting PSQI (score of 4+), ESS (10+) and AIS (5+) to 
-# binary (sleep disturbance =1)
+# ------------------------------------------------------------------------------
+# converting PSQI (score of 4+), ESS (10+) and AIS (5+) to binary (sleep disturbance =1)
 key_variables$PSQI_binary <- ifelse(key_variables$PSQI > 4, 1, 0)
 key_variables$ESS_binary <- ifelse(key_variables$ESS > 10, 1, 0)
 key_variables$AIS_binary <- ifelse(key_variables$AIS > 5, 1, 0)
@@ -75,7 +79,7 @@ sleep_counts <- rbind(
 print(sleep_counts)
 
 # ------------------------------------------------------------------------------
-# Data Quality Checks 
+# Data Quality Checks - Ill do more here HC
 # ------------------------------------------------------------------------------
 summary(key_variables)
 
@@ -208,6 +212,7 @@ prevalence_table <- data.frame(
 
 print(prevalence_table)
 
+#shoudl we include these summaires here or just in the report? i feel like our R file is massive lol - HC
 # Individual prevalence by instrument (PSQI, AIS, ESS, BSS):
 # PSQI 63.9% (n=183, 32% missing) | AIS 55.3% (n=262) |
 # ESS 26.7% (n=251) | BSS 38.9% (n=262)
@@ -451,9 +456,8 @@ summary(Composite_stepback_model)
 
 round(exp(coef(Composite_stepback_model)), 3)
 
-# ----------------------------------------------------------------------------
+
 # Finding sample size used per model (after missing data was ommitted)
-# ----------------------------------------------------------------------------
 nrow(PSQI_data)
 nrow(ESS_data)
 nrow(AIS_data)
@@ -480,11 +484,14 @@ bss_coef  <- summary(BSS_stepback_model)$coefficients
 bss_or <- exp(coef(BSS_stepback_model))
 print(round(bss_or, 3))
 
+#sorry i have this here it was just easier for me to visualize, Ill remove before we submit - HC
 write.csv(key_variables, "key_variables.csv", row.names = FALSE)
 
 
 
-
+#####
+# Question 2
+#####
 library(car)   # for vif() 
 
 qol_vars    <- c("SF36_PCS", "SF36_MCS")
