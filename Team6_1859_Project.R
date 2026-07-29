@@ -32,7 +32,8 @@ colnames(key_variables) <- c("Subject","PSQI", "ESS", "BSS", "AIS", "SF36_PCS",
 # ------------------------------------------------------------------------------
 # Derived Variables
 # ------------------------------------------------------------------------------
-# converting PSQI (score of 4+), ESS (10+) and AIS (5+) to binary (sleep disturbance =1)
+# converting PSQI (score of 4+), ESS (10+) and AIS (5+) to 
+# binary (sleep disturbance =1)
 key_variables$PSQI_binary <- ifelse(key_variables$PSQI > 4, 1, 0)
 key_variables$ESS_binary <- ifelse(key_variables$ESS > 10, 1, 0)
 key_variables$AIS_binary <- ifelse(key_variables$AIS > 5, 1, 0)
