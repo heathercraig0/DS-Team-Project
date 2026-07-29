@@ -280,7 +280,11 @@ composite_test
 # ----------------------------------------------------------------------------
 key_variables$Gender <- factor(key_variables$Gender, 
                                labels = c("Male", "Female"))
-key_variables$LiverDiagnosis <- factor(key_variables$LiverDiagnosis)
+key_variables$LiverDiagnosis <- factor(
+  key_variables$LiverDiagnosis,
+  labels = c("Hepatitis C", "Hepatitis B", "PSC/PBC/AIH",
+             "Alcohol-related", "Other/heterogeneous")
+)
 key_variables$DiseaseRecurrence <- factor(key_variables$DiseaseRecurrence, 
                                           labels = c("No", "Yes"))
 key_variables$Rejection <- factor(key_variables$Rejection, 
@@ -315,9 +319,9 @@ PSQI_data <- na.omit(key_variables[, c(
   "Corticosteroid"
 )])
 # Full model creation 
-model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
-                   DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
-                   Depression + Corticosteroid,
+model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime + 
+                        LiverDiagnosis +DiseaseRecurrence + Rejection + Fibrosis 
+                      + RenalFailure +Depression + Corticosteroid,
                  data = PSQI_data)
 # Stepback best model generation 
 PSQI_stepback_model <- stepAIC(
@@ -477,3 +481,180 @@ bss_or <- exp(coef(BSS_stepback_model))
 print(round(bss_or, 3))
 
 write.csv(key_variables, "key_variables.csv", row.names = FALSE)
+
+
+
+
+library(car)   # for vif() 
+
+qol_vars    <- c("SF36_PCS", "SF36_MCS")
+sleep_flags <- c("PSQI_binary", "ESS_binary", "AIS_binary", "BSS",
+                 "Sleep_disturbed_composite")
+
+# ----------------------------------------------------------------------------
+# 1. Visual comparison: boxplots of QoL by sleep-disturbance status
+#    
+# ----------------------------------------------------------------------------
+par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
+for (qv in qol_vars) {
+  for (sv in sleep_flags) {
+    boxplot(key_variables[[qv]] ~ key_variables[[sv]],
+            main = paste(qv, "by", sv), xlab = sv, ylab = qv)
+  }
+}
+par(mfrow = c(1, 1))
+
+# ----------------------------------------------------------------------------
+# 2. Group comparisons: disturbed vs. not disturbed, per instrument
+# ----------------------------------------------------------------------------
+compare_group <- function(qol_var, group_var) {
+  d  <- key_variables[!is.na(key_variables[[group_var]]) &
+                        !is.na(key_variables[[qol_var]]), ]
+  g0 <- d[[qol_var]][d[[group_var]] == 0]
+  g1 <- d[[qol_var]][d[[group_var]] == 1]
+  
+  t_res <- t.test(g1, g0)
+  w_res <- wilcox.test(g1, g0, conf.int = TRUE)
+  
+  data.frame(
+    QoL_Variable   = qol_var,
+    Sleep_Variable = group_var,
+    N_disturbed    = length(g1),
+    N_not          = length(g0),
+    Mean_disturbed = round(mean(g1), 2),
+    Mean_not       = round(mean(g0), 2),
+    t_p            = round(t_res$p.value, 4),
+    wilcox_p       = round(w_res$p.value, 4)
+  )
+}
+
+qol_comparison_results <- do.call(rbind, lapply(qol_vars, function(qv) {
+  do.call(rbind, lapply(sleep_flags, function(sv) compare_group(qv, sv)))
+}))
+
+# Holm-adjusted p-values across the 10 comparisons (each test family adjusted
+# separately) 
+qol_comparison_results$t_p_holm      <- round(p.adjust(
+  qol_comparison_results$t_p, method = "holm"), 4)
+qol_comparison_results$wilcox_p_holm <- round(p.adjust(
+  qol_comparison_results$wilcox_p, method = "holm"), 4)
+print(qol_comparison_results)
+
+# ----------------------------------------------------------------------------
+# 3. Correlation between continuous sleep scores and QoL
+#    Pearson AND Spearman side by side
+#    (cor.test(..., use = "complete.obs") and method = "spearman")
+# ----------------------------------------------------------------------------
+continuous_sleep_vars <- c("PSQI", "ESS", "AIS")
+
+correlation_results <- data.frame()
+for (sv in continuous_sleep_vars) {
+  for (qv in qol_vars) {
+    pear  <- cor.test(key_variables[[sv]], key_variables[[qv]], use = 
+                        "complete.obs")
+    spear <- cor.test(key_variables[[sv]], key_variables[[qv]], method = 
+                        "spearman")
+    correlation_results <- rbind(correlation_results, data.frame(
+      Sleep_Variable = sv,
+      QoL_Variable   = qv,
+      Pearson_r      = round(unname(pear$estimate), 3),
+      Pearson_p      = round(pear$p.value, 4),
+      Spearman_rho   = round(unname(spear$estimate), 3),
+      Spearman_p     = round(spear$p.value, 4)
+    ))
+  }
+}
+print(correlation_results)
+
+# quick scatterplot matrix
+pairs(key_variables[, c(continuous_sleep_vars, qol_vars)])
+
+# ----------------------------------------------------------------------------
+# 4. Multivariable regression + formal nested-model test 
+#    Reduced model: covariates only. Full model: covariates + sleep
+#    disturbance (composite). anova(reduced, full) gives an F-test for
+#    whether adding sleep disturbance significantly improves the fit - this
+#    IS the formal test of RQ2's hypothesis (H0: no association between
+#    sleep disturbance and QoL, adjusting for covariates).
+# ----------------------------------------------------------------------------
+covariates <- "Age + Gender + BMI + TransplantTime + LiverDiagnosis + 
+DiseaseRecurrence + Rejection + Fibrosis + RenalFailure + Depression + 
+Corticosteroid"
+
+# --- SF36_PCS ---
+reduced_PCS <- lm(as.formula(paste("SF36_PCS ~", covariates)), data = 
+                    key_variables)
+full_PCS    <- lm(as.formula(paste("SF36_PCS ~ Sleep_disturbed_composite +", 
+                                   covariates)),
+                  data = key_variables)
+
+anova(reduced_PCS, full_PCS)      # F-test: does adding sleep disturbance help?
+AIC(reduced_PCS, full_PCS)        # AIC comparison, corroborating evidence
+summary(full_PCS)
+confint(full_PCS)["Sleep_disturbed_composite", ]   # 95% CI for the sleep effect
+vif(full_PCS)                         # check multicollinearity among predictors
+
+# residual diagnostics
+par(mfrow = c(1, 2))
+hist(resid(full_PCS), main = "Residuals: PCS model", xlab = "")
+qqnorm(resid(full_PCS)); qqline(resid(full_PCS), col = 2)
+par(mfrow = c(1, 1))
+plot(fitted(full_PCS), resid(full_PCS), xlab = "Fitted", ylab = "Residuals",
+     main = "Residuals vs Fitted: PCS model")
+abline(h = 0, lty = 2)
+
+# --- SF36_MCS --- (identical structure)
+reduced_MCS <- lm(as.formula(paste("SF36_MCS ~", covariates)), data = 
+                    key_variables)
+full_MCS    <- lm(as.formula(paste("SF36_MCS ~ Sleep_disturbed_composite +", 
+                                   covariates)),
+                  data = key_variables)
+
+anova(reduced_MCS, full_MCS)
+AIC(reduced_MCS, full_MCS)
+summary(full_MCS)
+confint(full_MCS)["Sleep_disturbed_composite", ]
+vif(full_MCS)
+
+par(mfrow = c(1, 2))
+hist(resid(full_MCS), main = "Residuals: MCS model", xlab = "")
+qqnorm(resid(full_MCS)); qqline(resid(full_MCS), col = 2)
+par(mfrow = c(1, 1))
+plot(fitted(full_MCS), resid(full_MCS), xlab = "Fitted", ylab = "Residuals",
+     main = "Residuals vs Fitted: MCS model")
+abline(h = 0, lty = 2)
+
+# ----------------------------------------------------------------------------
+# 5. Sensitivity: repeat the nested-model test using each individual sleep
+#    instrument instead of the composite, to see whether the QoL association
+#    is consistent across instruments or specific to one facet of sleep
+#    (same "does each instrument tell the same story?" logic used in RQ1).
+#    NOTE: the reduced model is refit on the same non-missing subset as the
+#    full model in each case - anova() will error/mismatch otherwise if the
+#    two models are fit to different numbers of complete cases (this is the
+#    exact issue Tutorial 8/9 flagged when comparing nested models).
+# ----------------------------------------------------------------------------
+exposures <- c("PSQI_binary", "ESS_binary", "AIS_binary", "BSS")
+
+sensitivity_results <- data.frame()
+for (ex in exposures) {
+  for (qv in qol_vars) {
+    full_form <- as.formula(paste(qv, "~", ex, "+", covariates))
+    m_full    <- lm(full_form, data = key_variables)
+    
+    d_reduced  <- key_variables[!is.na(key_variables[[ex]]), ]
+    m_reduced  <- lm(as.formula(paste(qv, "~", covariates)), data = d_reduced)
+    
+    a <- anova(m_reduced, m_full)
+    sensitivity_results <- rbind(sensitivity_results, data.frame(
+      QoL_Variable   = qv,
+      Sleep_Exposure = ex,
+      F_p_value      = round(a$`Pr(>F)`[2], 4),
+      N              = nobs(m_full)
+    ))
+  }
+}
+sensitivity_results$Significant <- ifelse(sensitivity_results$F_p_value < 0.05, 
+                                          "Yes", "No")
+print(sensitivity_results)
+
