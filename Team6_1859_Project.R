@@ -30,7 +30,7 @@ colnames(key_variables) <- c("Subject","PSQI", "ESS", "BSS", "AIS", "SF36_PCS",
                              "Corticosteroid")
 
 # ------------------------------------------------------------------------------
-# Derived Variables
+# Derived binary variables
 # ------------------------------------------------------------------------------
 # converting PSQI (score of 4+), ESS (10+) and AIS (5+) to 
 # binary (sleep disturbance =1)
@@ -80,13 +80,14 @@ sleep_counts <- rbind(
 print(sleep_counts)
 
 # ------------------------------------------------------------------------------
-# Data Quality Checks - Ill do more here HC
+# Data quality checks & description of relevant data
 # ------------------------------------------------------------------------------
+head(key_variables)
 summary(key_variables)
+dim(key_variables)
+colnames(key_variables)
 
-# ------------------------------------------------------------------------------
-# Description of relevant data
-# ------------------------------------------------------------------------------
+# variable to hold continuous variables for simplicity
 continuous_vars <- c("Age", "BMI", "TransplantTime", "SF36_PCS", "SF36_MCS", 
                      "PSQI", "ESS", "AIS")
 
@@ -97,6 +98,7 @@ median_vals <- c()
 iqr_vals    <- c()
 na_vals     <- c()
 
+# looping through each variable for descriptive statistics  
 for (v in continuous_vars) {
   x <- key_variables[[v]]   # pull out the column by name
   mean_vals   <- c(mean_vals,   mean(x, na.rm = TRUE))
