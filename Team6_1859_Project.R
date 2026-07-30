@@ -474,9 +474,9 @@ write.csv(key_variables, "key_variables.csv", row.names = FALSE)
 
 
 
-# ==============================================================================
+# ----------------------------------------------------------------------------
 # QUESTION 2: RELATIONSHIP BETWEEN SLEEP DISTURBANCE AND QUALITY OF LIFE
-# ==============================================================================
+# ----------------------------------------------------------------------------
 
 # Identify the two quality-of-life outcomes.
 # Higher SF36 scores indicate better quality of life.
@@ -580,7 +580,6 @@ print(pair_sample_sizes)
 # Create a function to calculate the main descriptive statistics for each
 # quality-of-life outcome.
 summarize_qol <- function(x) {
-  
   data.frame(
     Valid_n = sum(!is.na(x)),
     Missing_n = sum(is.na(x)),
@@ -733,18 +732,14 @@ par(mfrow = c(1, 1))
 # Create an empty data frame to collect the six correlation results:
 # three continuous sleep measures examined against two QoL outcomes.
 correlation_results <- data.frame()
-
 for (sleep_var in continuous_sleep_vars) {
-  
   for (qol_var in qol_vars) {
-    
     # Keep only patients with valid values for the specific sleep measure
     # and quality-of-life outcome being analyzed.
     analysis_data <- key_variables[
       complete.cases(key_variables[, c(sleep_var, qol_var)]),
       c(sleep_var, qol_var)
     ]
-    
     # Use Pearson correlation because both variables are numeric and the
     # scatterplots showed approximately linear relationships.
     correlation_test <- cor.test(
@@ -752,7 +747,6 @@ for (sleep_var in continuous_sleep_vars) {
       analysis_data[[qol_var]],
       method = "pearson"
     )
-    
     # Store the sample size, correlation estimate, 95% confidence interval
     # and original unadjusted p-value for each relationship.
     correlation_results <- rbind(
@@ -773,26 +767,14 @@ for (sleep_var in continuous_sleep_vars) {
 # Adjust the six original p-values using the Holm method.
 # This reduces the risk of false-positive conclusions from conducting several
 # sleep-QoL correlation tests.
-correlation_results$Holm_P <- p.adjust(
-  correlation_results$P_Value,
-  method = "holm"
-)
+correlation_results$Holm_P <- p.adjust(correlation_results$P_Value,method = "holm")
 
 # Round the correlation estimates and confidence intervals for presentation.
-correlation_results$Correlation <- round(
-  correlation_results$Correlation,
-  3
-)
+correlation_results$Correlation <- round(correlation_results$Correlation,3)
 
-correlation_results$CI_Lower <- round(
-  correlation_results$CI_Lower,
-  3
-)
+correlation_results$CI_Lower <- round(correlation_results$CI_Lower,3)
 
-correlation_results$CI_Upper <- round(
-  correlation_results$CI_Upper,
-  3
-)
+correlation_results$CI_Upper <- round(correlation_results$CI_Upper,3)
 
 # Create display versions of the p-values.
 # Values below 0.0001 are reported as "<0.0001" rather than incorrectly
