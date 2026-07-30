@@ -112,7 +112,7 @@ continuous_summary <- data.frame(
   Variable = continuous_vars,
   Mean     = round(mean_vals, 2),
   SD       = round(sd_vals, 2),
-  Median   = round(median_vals, 2),
+  Median   = round(meCI fordian_vals, 2),
   IQR      = round(iqr_vals, 2),
   Missing  = na_vals,
   N_valid  = nrow(key_variables) - na_vals
@@ -330,7 +330,7 @@ PSQI_data <- na.omit(key_variables[, c(
 )])
 # Full model creation 
 model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime
-                      +DiseaseRecurrence + Rejection + Fibrosis 
+                      + DiseaseRecurrence + Rejection + Fibrosis 
                       + RenalFailure +Depression + Corticosteroid,
                  data = PSQI_data)
 # Stepback best model generation 
@@ -414,11 +414,9 @@ BSS_data <- na.omit(key_variables[, c(
 )])
 
 # Full candidate model using 6 predictor DoF
-model_BSS_full <- glm(
-  BSS ~ Age + Gender + BMI + DiseaseRecurrence +
-    Depression + Corticosteroid,
-  data = BSS_data,
-  family = binomial
+model_BSS_full <- glm(BSS ~ Age + Gender + BMI + DiseaseRecurrence +
+                      Depression + Corticosteroid, data = BSS_data,
+                      family = binomial
 )
 
 # Backward AIC selection
@@ -429,30 +427,27 @@ BSS_stepback_model <- stepAIC(
 )
 
 summary(BSS_stepback_model)
+round(exp(coef(BSS_stepback_model)), 3)
 
 # ----------------------------------------------------------------------------
 # Overall Disturbance Model  - Logistic Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
-# Max 8 DoF (123/15), so need to remove 
+# Max 8 DoF (123/15), so need to remove some predictors for full model
 Composite_data <- na.omit(key_variables[, c(
   "Sleep_disturbed_composite",
   "Age",
   "Gender",
   "BMI",
-  "TransplantTime",
-  "LiverDiagnosis",
   "DiseaseRecurrence",
   "Rejection",
   "Fibrosis",
-  "RenalFailure",
   "Depression",
   "Corticosteroid"
 )])
 
 model_Composite_full <- glm(
-  Sleep_disturbed_composite ~ Age + Gender + BMI + TransplantTime + 
-    LiverDiagnosis + DiseaseRecurrence + Rejection + Fibrosis + 
-    RenalFailure + Depression + Corticosteroid,
+  Sleep_disturbed_composite ~ Age + Gender + BMI + DiseaseRecurrence + 
+    Rejection + Fibrosis + Depression + Corticosteroid,
   data = Composite_data,
   family = binomial
 )
