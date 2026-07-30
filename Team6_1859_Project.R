@@ -304,11 +304,14 @@ key_variables$Depression <- factor(key_variables$Depression,
 key_variables$Corticosteroid <- factor(key_variables$Corticosteroid, 
                                        labels = c("No", "Yes"))
 
-
+# Restricting the Number of Predictors 
+# liver diagnosis has 5 levels (4 degrees of freedom), all other categorical have 2 levels (1 degree of freedom), continuous variables have 1 degree of freedom 
+# total of 14 degrees of freedom 
 # ----------------------------------------------------------------------------
 # PSQI Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
 library(MASS)
+# Max degree of freedom is 12 (183/15=12.2), but 15 predictor DoF so removing LiverDiagnosis to satisfy 
 # Removing missing data 
 PSQI_data <- na.omit(key_variables[, c(
   "PSQI",
@@ -316,7 +319,6 @@ PSQI_data <- na.omit(key_variables[, c(
   "Gender",
   "BMI",
   "TransplantTime",
-  "LiverDiagnosis",
   "DiseaseRecurrence",
   "Rejection",
   "Fibrosis",
@@ -325,8 +327,8 @@ PSQI_data <- na.omit(key_variables[, c(
   "Corticosteroid"
 )])
 # Full model creation 
-model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime + 
-                        LiverDiagnosis +DiseaseRecurrence + Rejection + Fibrosis 
+model_PSQI_full <- lm(PSQI ~ Age + Gender + BMI + TransplantTime
+                      +DiseaseRecurrence + Rejection + Fibrosis 
                       + RenalFailure +Depression + Corticosteroid,
                  data = PSQI_data)
 # Stepback best model generation 
@@ -340,6 +342,7 @@ summary(PSQI_stepback_model)
 # ----------------------------------------------------------------------------
 # ESS Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
+# Max DoF is 16.7 (251/15) so no predictors have to be removed
 ESS_data <- na.omit(key_variables[, c(
   "ESS",
   "Age",
@@ -368,6 +371,7 @@ summary(ESS_stepback_model)
 # ----------------------------------------------------------------------------
 # AIS Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
+# Max predictor DoF is 17 (17.4) so no predictors need to be removed
 AIS_data <- na.omit(key_variables[, c(
   "AIS",
   "Age",
@@ -396,34 +400,38 @@ summary(AIS_stepback_model)
 # ----------------------------------------------------------------------------
 # BSS Model  - Logistic Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
+# Max predictor DoF is 6 (102/15=6.8) so need to remove
 BSS_data <- na.omit(key_variables[, c(
   "BSS",
   "Age",
   "Gender",
   "BMI",
-  "TransplantTime",
-  "LiverDiagnosis",
   "DiseaseRecurrence",
-  "Rejection",
-  "Fibrosis",
-  "RenalFailure",
   "Depression",
   "Corticosteroid"
 )])
-model_BSS_full <- glm(BSS ~ Age + Gender + BMI + TransplantTime + LiverDiagnosis +
-                   DiseaseRecurrence + Rejection + Fibrosis + RenalFailure +
-                   Depression + Corticosteroid,
-                 data = BSS_data, family = binomial)
+
+# Full candidate model using 6 predictor DoF
+model_BSS_full <- glm(
+  BSS ~ Age + Gender + BMI + DiseaseRecurrence +
+    Depression + Corticosteroid,
+  data = BSS_data,
+  family = binomial
+)
+
+# Backward AIC selection
 BSS_stepback_model <- stepAIC(
   model_BSS_full,
   direction = "backward",
   trace = FALSE
 )
+
 summary(BSS_stepback_model)
 
 # ----------------------------------------------------------------------------
 # Overall Disturbance Model  - Logistic Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
+# Max 8 DoF (123/15), so need to remove 
 Composite_data <- na.omit(key_variables[, c(
   "Sleep_disturbed_composite",
   "Age",
@@ -463,6 +471,7 @@ nrow(PSQI_data)
 nrow(ESS_data)
 nrow(AIS_data)
 nrow(BSS_data)
+nrow(Composite_data)
 
 # ----------------------------------------------------------------------------
 # Summary: predictor significance/direction across the 4 sleep models
@@ -484,6 +493,8 @@ print(ais_coef)
 bss_coef  <- summary(BSS_stepback_model)$coefficients
 bss_or <- exp(coef(BSS_stepback_model))
 print(round(bss_or, 3))
+
+
 
 #sorry i have this here it was just easier for me to visualize, Ill remove before we submit - HC
 write.csv(key_variables, "key_variables.csv", row.names = FALSE)
