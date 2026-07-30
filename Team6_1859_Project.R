@@ -459,9 +459,7 @@ Composite_stepback_model <- stepAIC(
 )
 
 summary(Composite_stepback_model)
-
 round(exp(coef(Composite_stepback_model)), 3)
-
 
 # Finding sample size used per model (after missing data was ommitted)
 nrow(PSQI_data)
