@@ -30,7 +30,7 @@ colnames(key_variables) <- c("Subject","PSQI", "ESS", "BSS", "AIS", "SF36_PCS",
                              "Corticosteroid")
 
 # ------------------------------------------------------------------------------
-# Derived binary variables
+# Deriving binary variables
 # ------------------------------------------------------------------------------
 # converting PSQI (score of 4+), ESS (10+) and AIS (5+) to 
 # binary (sleep disturbance =1)
@@ -120,6 +120,9 @@ continuous_summary <- data.frame(
 
 print(continuous_summary)
 
+#---------------------------------------------------
+
+#---------------------------------------------------
 # Define the labels for each categorical variable
 # (names match the actual numeric codes in the data, as text)
 labels_list <- list(
@@ -151,10 +154,10 @@ for (v in categorical_vars) {
   counts <- table(x)                          # valid (non-missing) counts only
   pct    <- round(prop.table(counts) * 100, 1)
   
-  # translate the numeric codes (as text) into labels using the lookup above
+# translate the numeric codes (as text) into labels using the lookup above
   category_labels <- labels_list[[v]][names(counts)]
   
-  # build this variable's rows
+ # build this variable's rows
   var_rows <- data.frame(
     Variable = c(v, rep("", length(counts) - 1)),  # only show variable name once
     Category = category_labels,
@@ -170,10 +173,10 @@ print(categorical_summary)
 
 
 # ----------------------------------------------------------------------------
-# Individual prevalence for each of the 4 sleep instruments
+# Q1 Prevalence for each of the 4 sleep instruments and overall
 # ----------------------------------------------------------------------------
-# Denominator = No + Yes (i.e. Not Total since Missing is excluded from the 
-# denominator)
+# Prevalence of each of the instruments
+# Denominator = No + Yes (i.e. Not Total since Missing is excluded from the denominator)
 # Using binom.test() for 95% CI.
 
 # --- PSQI ---
@@ -200,7 +203,7 @@ bss_n <- bss_row$Yes + bss_row$No
 bss_test <- binom.test(bss_row$Yes, bss_n)
 bss_test
 
-# --- Collect into one summary table ---
+# --- Prevalence summary table ---
 prevalence_table <- data.frame(
   Variable    = c("PSQI", "AIS", "ESS", "BSS"),
   n_valid     = c(psqi_n, ais_n, ess_n, bss_n),
@@ -215,19 +218,10 @@ prevalence_table <- data.frame(
 
 print(prevalence_table)
 
-#shoudl we include these summaires here or just in the report? i feel like our R file is massive lol - HC
-# Individual prevalence by instrument (PSQI, AIS, ESS, BSS):
-# PSQI 63.9% (n=183, 32% missing) | AIS 55.3% (n=262) |
-# ESS 26.7% (n=251) | BSS 38.9% (n=262)
-# Prevalence ranges widely (26.7%-63.9%). Consistent with each
-# instrument capturing a different facet of sleep disturbance
-
-# ----------------------------------------------------------------------------
-# Overall (composite) prevalence: subject classified as "disturbed" if
-# >=50% of their COMPLETED sleep instruments flagged disturbance.
+# Overall (composite) prevalence
+# A subject classified as "disturbed" if >=50% of their COMPLETED sleep instruments flagged disturbance. 
 # Denominator per subject = number of instruments they actually completed
-# (missing instruments are excluded, not counted as "not disturb0ed").
-# ----------------------------------------------------------------------------
+# (missing instruments are excluded, not counted as "not disturbed").
 
 # Pull the 4 binary sleep flags together (BSS is already binary, no _binary suffix)
 sleep_binary_matrix <- key_variables[c("PSQI_binary", "ESS_binary", "AIS_binary", 
@@ -253,15 +247,11 @@ key_variables$Sleep_disturbed_composite <- ifelse(
   ifelse(key_variables$Pct_disturbed >= 0.5, 1, 0)
 )
 
-# Check how many subjects have each number of completed tests, and how many
-# ended up disturbed/not disturbed/NA on the composite
+# Check number of completed instruments and composite classification 
 table(key_variables$Total_tests_done, useNA = "ifany")
 table(key_variables$Sleep_disturbed_composite, useNA = "ifany")
 
-# ----------------------------------------------------------------------------
-# Overall prevalence: restrict to subjects with a valid composite value
-# (excludes the small number with 0 completed instruments), then binom.test()
-# ----------------------------------------------------------------------------
+# Calcualte overall prevelence 
 composite_valid <- key_variables[!is.na(key_variables$Sleep_disturbed_composite), ]
 composite_n <- nrow(composite_valid)
 composite_x <- sum(composite_valid$Sleep_disturbed_composite)
@@ -270,22 +260,11 @@ composite_test <- binom.test(composite_x, composite_n)
 composite_test
 
 
-# Composite sleep disturbance measure - derivation steps:
-#   1. Binarize continuous instruments (PSQI>4, ESS>10, AIS>5); BSS already binary
-#   2. Total_tests_done = count of non-missing instruments per subject (0-4)
-#   3. Pct_disturbed = Tests_disturbed / Total_tests_done (NA if 0 tests done,
-#      not 0 - percentage is undefined, not zero)
-#   4. Sleep_disturbed_composite = 1 if Pct_disturbed >= 0.5 (ties go to
-#      "disturbed"), else 0; NA subjects excluded from prevalence calc
-#
-# Result: overall prevalence = 53.4% (95% CI: 47.2%-59.5%, n=264; 4 subjects
-# with zero completed instruments excluded). Falls within the range of
-# individual instruments (26.7%-63.9%), closer to AIS/PSQI than ESS.
-
 
 # ----------------------------------------------------------------------------
-# Convert categorical predictors to factors 
+# Q1 Predictive Models 
 # ----------------------------------------------------------------------------
+# Convert categorical predictors to factors
 key_variables$Gender <- factor(key_variables$Gender, 
                                labels = c("Male", "Female"))
 key_variables$LiverDiagnosis <- factor(
@@ -306,15 +285,13 @@ key_variables$Depression <- factor(key_variables$Depression,
 key_variables$Corticosteroid <- factor(key_variables$Corticosteroid, 
                                        labels = c("No", "Yes"))
 
-# Restricting the Number of Predictors 
-# liver diagnosis has 5 levels (4 degrees of freedom), all other categorical have 2 levels (1 degree of freedom), continuous variables have 1 degree of freedom 
-# total of 14 degrees of freedom 
-# ----------------------------------------------------------------------------
+# Restricting the Number of Predictors;  LiverDiagnosis has 5 levels = 4 DoF, all other categorical and continuous predictors contribute 1 DoF
+# Total candidate predictor DoF = 14.
+
 # PSQI Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
 library(MASS)
-# Max degree of freedom is 12 (183/15=12.2), but 15 predictor DoF so removing LiverDiagnosis to satisfy 
-# Removing missing data 
+#Max DoF is 12 (183/15 = 12.2), so LiverDiagnosis was removed to reduce the candidate model from 14 to 10 DoF.# Removing missing data 
 PSQI_data <- na.omit(key_variables[, c(
   "PSQI",
   "Age",
@@ -341,10 +318,10 @@ PSQI_stepback_model <- stepAIC(
 )
 summary(PSQI_stepback_model)
 
-# ----------------------------------------------------------------------------
+
 # ESS Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
-# Max DoF is 16.7 (251/15) so no predictors have to be removed
+# All 14 candidate predictor DoF can be included in the initial full model
 ESS_data <- na.omit(key_variables[, c(
   "ESS",
   "Age",
@@ -370,10 +347,10 @@ ESS_stepback_model <- stepAIC(
 )
 summary(ESS_stepback_model)
 
-# ----------------------------------------------------------------------------
+
 # AIS Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
-# Max predictor DoF is 17 (17.4) so no predictors need to be removed
+# All 14 candidate predictor DoF can be included in the initial full model
 AIS_data <- na.omit(key_variables[, c(
   "AIS",
   "Age",
@@ -399,7 +376,7 @@ AIS_stepback_model <- stepAIC(
 )
 summary(AIS_stepback_model)
 
-# ----------------------------------------------------------------------------
+
 # BSS Model  - Logistic Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
 # Max predictor DoF is 6 (102/15=6.8) so need to remove
@@ -429,7 +406,7 @@ BSS_stepback_model <- stepAIC(
 summary(BSS_stepback_model)
 round(exp(coef(BSS_stepback_model)), 3)
 
-# ----------------------------------------------------------------------------
+
 # Overall Disturbance Model  - Logistic Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
 # Max 8 DoF (123/15), so need to remove some predictors for full model
@@ -468,27 +445,28 @@ nrow(AIS_data)
 nrow(BSS_data)
 nrow(Composite_data)
 
-# ----------------------------------------------------------------------------
-# Summary: predictor significance/direction across the 4 sleep models
+
+# Summary: predictor significance
 # ----------------------------------------------------------------------------
 
-# Pull coefficient tables from each final model's summary()
-psqi_coef <- summary(PSQI_stepback_model)$coefficients
 psqi_coef <- round(summary(PSQI_stepback_model)$coefficients, 3)
 print(psqi_coef)
 
-ess_coef  <- summary(ESS_stepback_model)$coefficients
 ess_coef <- round(summary(ESS_stepback_model)$coefficients, 3)
 print(ess_coef)
 
-ais_coef  <- summary(AIS_stepback_model)$coefficients
 ais_coef <- round(summary(AIS_stepback_model)$coefficients, 3)
 print(ais_coef)
 
-bss_coef  <- summary(BSS_stepback_model)$coefficients
+bss_coef <- round(summary(BSS_stepback_model)$coefficients, 3)
+print(bss_coef)
 bss_or <- exp(coef(BSS_stepback_model))
 print(round(bss_or, 3))
 
+composite_coef <- round(summary(Composite_stepback_model)$coefficients, 3)
+print(composite_coef)
+composite_or <- round(exp(coef(Composite_stepback_model)), 3)
+print(composite_or)
 
 
 #sorry i have this here it was just easier for me to visualize, Ill remove before we submit - HC
