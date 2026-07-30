@@ -501,179 +501,1353 @@ write.csv(key_variables, "key_variables.csv", row.names = FALSE)
 
 
 
-#####
-# Question 2
-#####
-library(car)   # for vif() 
+# ==============================================================================
+# QUESTION 2: RELATIONSHIP BETWEEN SLEEP DISTURBANCE AND QUALITY OF LIFE
+# ==============================================================================
 
-qol_vars    <- c("SF36_PCS", "SF36_MCS")
-sleep_flags <- c("PSQI_binary", "ESS_binary", "AIS_binary", "BSS",
-                 "Sleep_disturbed_composite")
+# Identify the two quality-of-life outcomes.
+# Higher SF36 scores indicate better quality of life.
+qol_vars <- c("SF36_PCS", "SF36_MCS")
 
-# ----------------------------------------------------------------------------
-# 1. Visual comparison: boxplots of QoL by sleep-disturbance status
-#    
-# ----------------------------------------------------------------------------
-par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
-for (qv in qol_vars) {
-  for (sv in sleep_flags) {
-    boxplot(key_variables[[qv]] ~ key_variables[[sv]],
-            main = paste(qv, "by", sv), xlab = sv, ylab = qv)
+# PSQI, ESS and AIS are continuous sleep scores.
+# Higher values indicate worse sleep.
+continuous_sleep_vars <- c("PSQI", "ESS", "AIS")
+
+# BSS is binary:
+# 0 = low likelihood of sleep-disordered breathing
+# 1 = high likelihood of sleep-disordered breathing
+primary_sleep_vars <- c("PSQI", "ESS", "AIS", "BSS")
+
+# These clinically defined binary variables will be used later for secondary
+# comparisons between disturbed and non-disturbed patients.
+binary_sleep_vars <- c(
+  "PSQI_binary",
+  "ESS_binary",
+  "AIS_binary",
+  "BSS"
+)
+
+# Select the variables needed for the initial Question 2 data check.
+q2_variables <- c(
+  "SF36_PCS",
+  "SF36_MCS",
+  "PSQI",
+  "ESS",
+  "AIS",
+  "BSS"
+)
+
+# Verify that the selected variables have the expected data types and values.
+str(key_variables[q2_variables])
+summary(key_variables[q2_variables])
+
+# Count valid and missing observations for each Question 2 variable.
+q2_missing <- data.frame(
+  Variable = q2_variables,
+  Valid_n = sapply(
+    key_variables[q2_variables],
+    function(x) sum(!is.na(x))
+  ),
+  Missing_n = sapply(
+    key_variables[q2_variables],
+    function(x) sum(is.na(x))
+  )
+)
+
+# Calculate the percentage missing out of all 268 patients.
+q2_missing$Missing_Percent <- round(
+  q2_missing$Missing_n / nrow(key_variables) * 100,
+  1
+)
+
+print(q2_missing)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 2: AVAILABLE SAMPLE SIZE FOR EACH SLEEP-QOL RELATIONSHIP
+# ------------------------------------------------------------------------------
+
+# Not every patient completed every sleep assessment. Therefore, each
+# sleep-QoL analysis will have its own sample size rather than using all
+# 268 patients.
+
+pair_sample_sizes <- data.frame()
+
+# Repeat the calculation for each of the four sleep measures and both
+# quality-of-life outcomes.
+for (sleep_var in primary_sleep_vars) {
+  
+  for (qol_var in qol_vars) {
+    
+    # Count patients who have valid values for both the selected sleep
+    # measure and the selected quality-of-life outcome.
+    available_n <- sum(
+      complete.cases(
+        key_variables[, c(sleep_var, qol_var)]
+      )
+    )
+    
+    # Add the result to the sample-size table.
+    pair_sample_sizes <- rbind(
+      pair_sample_sizes,
+      data.frame(
+        Sleep_Variable = sleep_var,
+        QoL_Outcome = qol_var,
+        Available_n = available_n
+      )
+    )
   }
 }
-par(mfrow = c(1, 1))
 
-# ----------------------------------------------------------------------------
-# 2. Group comparisons: disturbed vs. not disturbed, per instrument
-# ----------------------------------------------------------------------------
-compare_group <- function(qol_var, group_var) {
-  d  <- key_variables[!is.na(key_variables[[group_var]]) &
-                        !is.na(key_variables[[qol_var]]), ]
-  g0 <- d[[qol_var]][d[[group_var]] == 0]
-  g1 <- d[[qol_var]][d[[group_var]] == 1]
-  
-  t_res <- t.test(g1, g0)
-  w_res <- wilcox.test(g1, g0, conf.int = TRUE)
+print(pair_sample_sizes)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 3: DESCRIBE PHYSICAL AND MENTAL QUALITY OF LIFE
+# ------------------------------------------------------------------------------
+
+# Create a function to calculate the main descriptive statistics for each
+# quality-of-life outcome.
+summarize_qol <- function(x) {
   
   data.frame(
-    QoL_Variable   = qol_var,
-    Sleep_Variable = group_var,
-    N_disturbed    = length(g1),
-    N_not          = length(g0),
-    Mean_disturbed = round(mean(g1), 2),
-    Mean_not       = round(mean(g0), 2),
-    t_p            = round(t_res$p.value, 4),
-    wilcox_p       = round(w_res$p.value, 4)
+    Valid_n = sum(!is.na(x)),
+    Missing_n = sum(is.na(x)),
+    Mean = round(mean(x, na.rm = TRUE), 2),
+    SD = round(sd(x, na.rm = TRUE), 2),
+    Median = round(median(x, na.rm = TRUE), 2),
+    IQR = round(IQR(x, na.rm = TRUE), 2),
+    Minimum = round(min(x, na.rm = TRUE), 2),
+    Maximum = round(max(x, na.rm = TRUE), 2)
   )
 }
 
-qol_comparison_results <- do.call(rbind, lapply(qol_vars, function(qv) {
-  do.call(rbind, lapply(sleep_flags, function(sv) compare_group(qv, sv)))
-}))
+# Apply the function separately to physical and mental quality of life.
+qol_summary <- rbind(
+  SF36_PCS = summarize_qol(key_variables$SF36_PCS),
+  SF36_MCS = summarize_qol(key_variables$SF36_MCS)
+)
 
-# Holm-adjusted p-values across the 10 comparisons (each test family adjusted
-# separately) 
-qol_comparison_results$t_p_holm      <- round(p.adjust(
-  qol_comparison_results$t_p, method = "holm"), 4)
-qol_comparison_results$wilcox_p_holm <- round(p.adjust(
-  qol_comparison_results$wilcox_p, method = "holm"), 4)
-print(qol_comparison_results)
+print(qol_summary)
 
-# ----------------------------------------------------------------------------
-# 3. Correlation between continuous sleep scores and QoL
-#    Pearson AND Spearman side by side
-#    (cor.test(..., use = "complete.obs") and method = "spearman")
-# ----------------------------------------------------------------------------
-continuous_sleep_vars <- c("PSQI", "ESS", "AIS")
+# ------------------------------------------------------------------------------
+# Q2 SECTION 4: EXAMINE THE DISTRIBUTIONS OF PCS AND MCS
+# ------------------------------------------------------------------------------
 
+# Display the two histograms side by side so their shapes can be compared.
+par(mfrow = c(1, 2))
+
+# Examine the distribution of physical quality-of-life scores.
+hist(
+  key_variables$SF36_PCS,
+  main = "Distribution of Physical Quality of Life",
+  xlab = "SF-36 PCS Score",
+  ylab = "Number of Patients",
+  col = "lightblue",
+  border = "white",
+  breaks = 10
+)
+
+# Add a vertical line showing the mean PCS score.
+abline(
+  v = mean(key_variables$SF36_PCS, na.rm = TRUE),
+  col = "red",
+  lwd = 2,
+  lty = 2
+)
+
+# Examine the distribution of mental quality-of-life scores.
+hist(
+  key_variables$SF36_MCS,
+  main = "Distribution of Mental Quality of Life",
+  xlab = "SF-36 MCS Score",
+  ylab = "Number of Patients",
+  col = "lightgreen",
+  border = "white",
+  breaks = 10
+)
+
+# Add a vertical line showing the mean MCS score.
+abline(
+  v = mean(key_variables$SF36_MCS, na.rm = TRUE),
+  col = "red",
+  lwd = 2,
+  lty = 2
+)
+
+# Return the graphics window to the normal one-plot layout.
+par(mfrow = c(1, 1))
+# ------------------------------------------------------------------------------
+# Q2 SECTION 5: VISUALIZE CONTINUOUS SLEEP SCORES AND QUALITY OF LIFE
+# ------------------------------------------------------------------------------
+
+# Create a reusable function for plotting one continuous sleep score against
+# one quality-of-life outcome.
+plot_sleep_qol <- function(sleep_var, qol_var, sleep_label, qol_label) {
+  
+  # Retain only patients with valid values for both variables being plotted.
+  # This allows each relationship to use all available observations without
+  # incorrectly requiring patients to have completed all four sleep measures.
+  plot_data <- key_variables[
+    complete.cases(key_variables[, c(sleep_var, qol_var)]),
+    c(sleep_var, qol_var)
+  ]
+  
+  # Create the scatterplot.
+  plot(
+    plot_data[[sleep_var]],
+    plot_data[[qol_var]],
+    main = paste(sleep_label, "and", qol_label),
+    xlab = sleep_label,
+    ylab = qol_label,
+    pch = 19,
+    col = rgb(0.2, 0.4, 0.7, 0.45)
+  )
+  
+  # Fit an unadjusted linear relationship for visualization only.
+  visual_model <- lm(
+    plot_data[[qol_var]] ~ plot_data[[sleep_var]]
+  )
+  
+  # Add the fitted line to show the direction of the relationship.
+  abline(
+    visual_model,
+    col = "red",
+    lwd = 2
+  )
+}
+
+# Display the six continuous sleep-QoL relationships together.
+par(mfrow = c(2, 3))
+
+# Physical quality-of-life relationships.
+plot_sleep_qol(
+  "PSQI", "SF36_PCS",
+  "PSQI Score", "SF-36 PCS"
+)
+
+plot_sleep_qol(
+  "ESS", "SF36_PCS",
+  "ESS Score", "SF-36 PCS"
+)
+
+plot_sleep_qol(
+  "AIS", "SF36_PCS",
+  "AIS Score", "SF-36 PCS"
+)
+
+# Mental quality-of-life relationships.
+plot_sleep_qol(
+  "PSQI", "SF36_MCS",
+  "PSQI Score", "SF-36 MCS"
+)
+
+plot_sleep_qol(
+  "ESS", "SF36_MCS",
+  "ESS Score", "SF-36 MCS"
+)
+
+plot_sleep_qol(
+  "AIS", "SF36_MCS",
+  "AIS Score", "SF-36 MCS"
+)
+
+# Return to the standard one-plot layout.
+par(mfrow = c(1, 1))
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 6: UNADJUSTED CORRELATIONS BETWEEN SLEEP AND QUALITY OF LIFE
+# ------------------------------------------------------------------------------
+
+# Create an empty data frame to collect the six correlation results:
+# three continuous sleep measures examined against two QoL outcomes.
 correlation_results <- data.frame()
-for (sv in continuous_sleep_vars) {
-  for (qv in qol_vars) {
-    pear  <- cor.test(key_variables[[sv]], key_variables[[qv]], use = 
-                        "complete.obs")
-    spear <- cor.test(key_variables[[sv]], key_variables[[qv]], method = 
-                        "spearman")
-    correlation_results <- rbind(correlation_results, data.frame(
-      Sleep_Variable = sv,
-      QoL_Variable   = qv,
-      Pearson_r      = round(unname(pear$estimate), 3),
-      Pearson_p      = round(pear$p.value, 4),
-      Spearman_rho   = round(unname(spear$estimate), 3),
-      Spearman_p     = round(spear$p.value, 4)
-    ))
+
+for (sleep_var in continuous_sleep_vars) {
+  
+  for (qol_var in qol_vars) {
+    
+    # Keep only patients with valid values for the specific sleep measure
+    # and quality-of-life outcome being analyzed.
+    analysis_data <- key_variables[
+      complete.cases(key_variables[, c(sleep_var, qol_var)]),
+      c(sleep_var, qol_var)
+    ]
+    
+    # Use Pearson correlation because both variables are numeric and the
+    # scatterplots showed approximately linear relationships.
+    correlation_test <- cor.test(
+      analysis_data[[sleep_var]],
+      analysis_data[[qol_var]],
+      method = "pearson"
+    )
+    
+    # Store the sample size, correlation estimate, 95% confidence interval
+    # and original unadjusted p-value for each relationship.
+    correlation_results <- rbind(
+      correlation_results,
+      data.frame(
+        Sleep_Variable = sleep_var,
+        QoL_Outcome = qol_var,
+        N = nrow(analysis_data),
+        Correlation = unname(correlation_test$estimate),
+        CI_Lower = correlation_test$conf.int[1],
+        CI_Upper = correlation_test$conf.int[2],
+        P_Value = correlation_test$p.value
+      )
+    )
   }
 }
-print(correlation_results)
 
-# quick scatterplot matrix
-pairs(key_variables[, c(continuous_sleep_vars, qol_vars)])
+# Adjust the six original p-values using the Holm method.
+# This reduces the risk of false-positive conclusions from conducting several
+# sleep-QoL correlation tests.
+correlation_results$Holm_P <- p.adjust(
+  correlation_results$P_Value,
+  method = "holm"
+)
 
-# ----------------------------------------------------------------------------
-# 4. Multivariable regression + formal nested-model test 
-#    Reduced model: covariates only. Full model: covariates + sleep
-#    disturbance (composite). anova(reduced, full) gives an F-test for
-#    whether adding sleep disturbance significantly improves the fit - this
-#    IS the formal test of RQ2's hypothesis (H0: no association between
-#    sleep disturbance and QoL, adjusting for covariates).
-# ----------------------------------------------------------------------------
-covariates <- "Age + Gender + BMI + TransplantTime + LiverDiagnosis + 
-DiseaseRecurrence + Rejection + Fibrosis + RenalFailure + Depression + 
-Corticosteroid"
+# Round the correlation estimates and confidence intervals for presentation.
+correlation_results$Correlation <- round(
+  correlation_results$Correlation,
+  3
+)
 
-# --- SF36_PCS ---
-reduced_PCS <- lm(as.formula(paste("SF36_PCS ~", covariates)), data = 
-                    key_variables)
-full_PCS    <- lm(as.formula(paste("SF36_PCS ~ Sleep_disturbed_composite +", 
-                                   covariates)),
-                  data = key_variables)
+correlation_results$CI_Lower <- round(
+  correlation_results$CI_Lower,
+  3
+)
 
-anova(reduced_PCS, full_PCS)      # F-test: does adding sleep disturbance help?
-AIC(reduced_PCS, full_PCS)        # AIC comparison, corroborating evidence
-summary(full_PCS)
-confint(full_PCS)["Sleep_disturbed_composite", ]   # 95% CI for the sleep effect
-vif(full_PCS)                         # check multicollinearity among predictors
+correlation_results$CI_Upper <- round(
+  correlation_results$CI_Upper,
+  3
+)
 
-# residual diagnostics
-par(mfrow = c(1, 2))
-hist(resid(full_PCS), main = "Residuals: PCS model", xlab = "")
-qqnorm(resid(full_PCS)); qqline(resid(full_PCS), col = 2)
+# Create display versions of the p-values.
+# Values below 0.0001 are reported as "<0.0001" rather than incorrectly
+# appearing as exactly zero after rounding.
+correlation_results$P_Value_Display <- ifelse(
+  correlation_results$P_Value < 0.0001,
+  "<0.0001",
+  formatC(
+    correlation_results$P_Value,
+    format = "f",
+    digits = 4
+  )
+)
+
+correlation_results$Holm_P_Display <- ifelse(
+  correlation_results$Holm_P < 0.0001,
+  "<0.0001",
+  formatC(
+    correlation_results$Holm_P,
+    format = "f",
+    digits = 4
+  )
+)
+
+# Select only the report-ready columns.
+# The unrounded numeric p-values remain stored in correlation_results.
+correlation_table <- correlation_results[, c(
+  "Sleep_Variable",
+  "QoL_Outcome",
+  "N",
+  "Correlation",
+  "CI_Lower",
+  "CI_Upper",
+  "P_Value_Display",
+  "Holm_P_Display"
+)]
+
+print(correlation_table)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 7: VISUAL COMPARISON OF QOL BY SLEEP-DISTURBANCE STATUS
+# ------------------------------------------------------------------------------
+
+# Create a function to compare a QoL outcome between patients classified
+# as not disturbed (0) and disturbed (1) for each sleep instrument.
+plot_binary_qol <- function(
+    group_var,
+    qol_var,
+    sleep_label,
+    qol_label
+) {
+  
+  # Use the available-case approach taught in Tutorial 10.
+  # Only patients with valid values for this specific sleep classification
+  # and QoL outcome are included in the plot.
+  plot_data <- key_variables[
+    complete.cases(key_variables[, c(group_var, qol_var)]),
+    c(group_var, qol_var)
+  ]
+  
+  # Create the boxplot using the approach demonstrated in Tutorial 9.
+  # The plot shows the median, spread and possible unusual observations
+  # within each sleep-disturbance group.
+  boxplot(
+    plot_data[[qol_var]] ~ plot_data[[group_var]],
+    names = c("Not Disturbed", "Disturbed"),
+    main = paste(qol_label, "by", sleep_label),
+    xlab = sleep_label,
+    ylab = qol_label,
+    col = c("lightgrey", "salmon")
+  )
+}
+
+# Display the eight comparisons together:
+# four sleep classifications examined against two QoL outcomes.
+par(mfrow = c(2, 4))
+
+# Physical quality-of-life comparisons.
+plot_binary_qol(
+  "PSQI_binary",
+  "SF36_PCS",
+  "PSQI Status",
+  "SF-36 PCS"
+)
+
+plot_binary_qol(
+  "ESS_binary",
+  "SF36_PCS",
+  "ESS Status",
+  "SF-36 PCS"
+)
+
+plot_binary_qol(
+  "AIS_binary",
+  "SF36_PCS",
+  "AIS Status",
+  "SF-36 PCS"
+)
+
+plot_binary_qol(
+  "BSS",
+  "SF36_PCS",
+  "BSS Risk",
+  "SF-36 PCS"
+)
+
+# Mental quality-of-life comparisons.
+plot_binary_qol(
+  "PSQI_binary",
+  "SF36_MCS",
+  "PSQI Status",
+  "SF-36 MCS"
+)
+
+plot_binary_qol(
+  "ESS_binary",
+  "SF36_MCS",
+  "ESS Status",
+  "SF-36 MCS"
+)
+
+plot_binary_qol(
+  "AIS_binary",
+  "SF36_MCS",
+  "AIS Status",
+  "SF-36 MCS"
+)
+
+plot_binary_qol(
+  "BSS",
+  "SF36_MCS",
+  "BSS Risk",
+  "SF-36 MCS"
+)
+
+# Return to the normal single-plot layout.
 par(mfrow = c(1, 1))
-plot(fitted(full_PCS), resid(full_PCS), xlab = "Fitted", ylab = "Residuals",
-     main = "Residuals vs Fitted: PCS model")
-abline(h = 0, lty = 2)
 
-# --- SF36_MCS --- (identical structure)
-reduced_MCS <- lm(as.formula(paste("SF36_MCS ~", covariates)), data = 
-                    key_variables)
-full_MCS    <- lm(as.formula(paste("SF36_MCS ~ Sleep_disturbed_composite +", 
-                                   covariates)),
-                  data = key_variables)
+# ------------------------------------------------------------------------------
+# Q2 SECTION 8: UNADJUSTED COMPARISON OF MEAN QOL BETWEEN SLEEP GROUPS
+# ------------------------------------------------------------------------------
 
-anova(reduced_MCS, full_MCS)
-AIC(reduced_MCS, full_MCS)
-summary(full_MCS)
-confint(full_MCS)["Sleep_disturbed_composite", ]
-vif(full_MCS)
+# This function compares mean QoL between patients classified as disturbed
+# and not disturbed for one sleep instrument.
+compare_qol_groups <- function(qol_var, group_var) {
+  
+  # Use the available-case approach from Tutorial 10.
+  # Only patients with valid values for this particular sleep classification
+  # and QoL outcome are included.
+  analysis_data <- key_variables[
+    complete.cases(key_variables[, c(qol_var, group_var)]),
+    c(qol_var, group_var)
+  ]
+  
+  # Separate QoL values according to sleep-disturbance status.
+  not_disturbed <- analysis_data[
+    analysis_data[[group_var]] == 0,
+    qol_var
+  ]
+  
+  disturbed <- analysis_data[
+    analysis_data[[group_var]] == 1,
+    qol_var
+  ]
+  
+  # Use Welch's two-sample t-test.
+  # Unlike the pooled t-test, Welch's test does not assume equal variances
+  # between the disturbed and not-disturbed groups.
+  test_result <- t.test(
+    disturbed,
+    not_disturbed,
+    var.equal = FALSE
+  )
+  
+  # The difference is calculated as disturbed minus not disturbed.
+  # A negative value means that the disturbed group has lower mean QoL.
+  data.frame(
+    QoL_Outcome = qol_var,
+    Sleep_Group = group_var,
+    N_Not_Disturbed = length(not_disturbed),
+    N_Disturbed = length(disturbed),
+    Mean_Not_Disturbed = mean(not_disturbed),
+    SD_Not_Disturbed = sd(not_disturbed),
+    Mean_Disturbed = mean(disturbed),
+    SD_Disturbed = sd(disturbed),
+    Mean_Difference =
+      mean(disturbed) - mean(not_disturbed),
+    CI_Lower = test_result$conf.int[1],
+    CI_Upper = test_result$conf.int[2],
+    P_Value = test_result$p.value
+  )
+}
 
-par(mfrow = c(1, 2))
-hist(resid(full_MCS), main = "Residuals: MCS model", xlab = "")
-qqnorm(resid(full_MCS)); qqline(resid(full_MCS), col = 2)
-par(mfrow = c(1, 1))
-plot(fitted(full_MCS), resid(full_MCS), xlab = "Fitted", ylab = "Residuals",
-     main = "Residuals vs Fitted: MCS model")
-abline(h = 0, lty = 2)
+# Create an empty data frame to collect all eight comparisons.
+group_comparison_results <- data.frame()
 
-# ----------------------------------------------------------------------------
-# 5. Sensitivity: repeat the nested-model test using each individual sleep
-#    instrument instead of the composite, to see whether the QoL association
-#    is consistent across instruments or specific to one facet of sleep
-#    (same "does each instrument tell the same story?" logic used in RQ1).
-#    NOTE: the reduced model is refit on the same non-missing subset as the
-#    full model in each case - anova() will error/mismatch otherwise if the
-#    two models are fit to different numbers of complete cases (this is the
-#    exact issue Tutorial 8/9 flagged when comparing nested models).
-# ----------------------------------------------------------------------------
-exposures <- c("PSQI_binary", "ESS_binary", "AIS_binary", "BSS")
-
-sensitivity_results <- data.frame()
-for (ex in exposures) {
-  for (qv in qol_vars) {
-    full_form <- as.formula(paste(qv, "~", ex, "+", covariates))
-    m_full    <- lm(full_form, data = key_variables)
+for (group_var in binary_sleep_vars) {
+  
+  for (qol_var in qol_vars) {
     
-    d_reduced  <- key_variables[!is.na(key_variables[[ex]]), ]
-    m_reduced  <- lm(as.formula(paste(qv, "~", covariates)), data = d_reduced)
-    
-    a <- anova(m_reduced, m_full)
-    sensitivity_results <- rbind(sensitivity_results, data.frame(
-      QoL_Variable   = qv,
-      Sleep_Exposure = ex,
-      F_p_value      = round(a$`Pr(>F)`[2], 4),
-      N              = nobs(m_full)
-    ))
+    group_comparison_results <- rbind(
+      group_comparison_results,
+      compare_qol_groups(
+        qol_var,
+        group_var
+      )
+    )
   }
 }
-sensitivity_results$Significant <- ifelse(sensitivity_results$F_p_value < 0.05, 
-                                          "Yes", "No")
-print(sensitivity_results)
 
+# Adjust the eight original p-values using the Holm method demonstrated in
+# Tutorial 9. This accounts for conducting several related comparisons.
+group_comparison_results$Holm_P <- p.adjust(
+  group_comparison_results$P_Value,
+  method = "holm"
+)
+
+# Round descriptive statistics, estimated differences and confidence intervals
+# only after all statistical calculations are complete.
+columns_to_round <- c(
+  "Mean_Not_Disturbed",
+  "SD_Not_Disturbed",
+  "Mean_Disturbed",
+  "SD_Disturbed",
+  "Mean_Difference",
+  "CI_Lower",
+  "CI_Upper"
+)
+
+group_comparison_results[columns_to_round] <- round(
+  group_comparison_results[columns_to_round],
+  2
+)
+
+# Create report-ready p-value columns.
+# Very small p-values are shown as "<0.0001" rather than zero.
+group_comparison_results$P_Value_Display <- ifelse(
+  group_comparison_results$P_Value < 0.0001,
+  "<0.0001",
+  formatC(
+    group_comparison_results$P_Value,
+    format = "f",
+    digits = 4
+  )
+)
+
+group_comparison_results$Holm_P_Display <- ifelse(
+  group_comparison_results$Holm_P < 0.0001,
+  "<0.0001",
+  formatC(
+    group_comparison_results$Holm_P,
+    format = "f",
+    digits = 4
+  )
+)
+
+# Select the columns needed for the report-ready comparison table.
+group_comparison_table <- group_comparison_results[, c(
+  "QoL_Outcome",
+  "Sleep_Group",
+  "N_Not_Disturbed",
+  "N_Disturbed",
+  "Mean_Not_Disturbed",
+  "SD_Not_Disturbed",
+  "Mean_Disturbed",
+  "SD_Disturbed",
+  "Mean_Difference",
+  "CI_Lower",
+  "CI_Upper",
+  "P_Value_Display",
+  "Holm_P_Display"
+)]
+
+print(group_comparison_table)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 9: CHECK SAMPLE SIZE RELATIVE TO THE NUMBER OF PREDICTORS
+# ------------------------------------------------------------------------------
+
+# Define the demographic and clinical variables specified in the assignment.
+covariate_names <- c(
+  "Age",
+  "Gender",
+  "BMI",
+  "TransplantTime",
+  "LiverDiagnosis",
+  "DiseaseRecurrence",
+  "Rejection",
+  "Fibrosis",
+  "RenalFailure",
+  "Depression",
+  "Corticosteroid"
+)
+
+# Create an empty table to store the model-size assessment.
+model_size_check <- data.frame()
+
+for (sleep_var in primary_sleep_vars) {
+  
+  for (qol_var in qol_vars) {
+    
+    # Identify every variable required for this particular adjusted model.
+    required_vars <- c(
+      qol_var,
+      sleep_var,
+      covariate_names
+    )
+    
+    # Use complete observations for all variables in the model, following the
+    # complete-case approach discussed in Tutorials 8 and 10.
+    model_data <- key_variables[
+      complete.cases(key_variables[, required_vars]),
+      required_vars
+    ]
+    
+    # Construct the proposed full-model formula.
+    candidate_formula <- reformulate(
+      termlabels = c(sleep_var, covariate_names),
+      response = qol_var
+    )
+    
+    # Create the model matrix to count the actual number of coefficients.
+    # This is important because a categorical variable such as liver diagnosis
+    # creates several indicator coefficients.
+    design_matrix <- model.matrix(
+      candidate_formula,
+      data = model_data
+    )
+    
+    # Exclude the intercept when counting regression coefficients.
+    number_of_coefficients <- ncol(design_matrix) - 1
+    
+    # Also record the number of named predictor terms.
+    number_of_terms <- length(
+      c(sleep_var, covariate_names)
+    )
+    
+    # Store the sample size and evaluate the p < m/15 guideline from
+    # Tutorial 9 using both the named terms and actual coefficients.
+    model_size_check <- rbind(
+      model_size_check,
+      data.frame(
+        QoL_Outcome = qol_var,
+        Sleep_Variable = sleep_var,
+        Complete_Case_N = nrow(model_data),
+        Predictor_Terms = number_of_terms,
+        Estimated_Coefficients = number_of_coefficients,
+        N_Divided_By_15 = round(nrow(model_data) / 15, 2),
+        Meets_Term_Rule =
+          number_of_terms < (nrow(model_data) / 15),
+        Meets_Coefficient_Rule =
+          number_of_coefficients < (nrow(model_data) / 15)
+      )
+    )
+  }
+}
+
+print(model_size_check)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 10: SELECT THE ADJUSTED LINEAR REGRESSION MODELS
+# ------------------------------------------------------------------------------
+
+# Tutorial 10 used the stepAIC() function from the MASS package to remove
+# predictors that do not improve a model enough.
+if (!requireNamespace("MASS", quietly = TRUE)) {
+  stop("Install the MASS package before running this section.")
+}
+
+# This list will store the final models so we can examine them later.
+selected_qol_models <- list()
+
+# This table will summarize how each model changed during selection.
+selection_summary <- data.frame()
+
+# Run the analysis separately for each sleep measure.
+for (sleep_var in primary_sleep_vars) {
+  
+  # Analyze physical and mental quality of life separately.
+  for (qol_var in qol_vars) {
+    
+    # List every variable needed for this model.
+    required_vars <- c(
+      qol_var,
+      sleep_var,
+      covariate_names
+    )
+    
+    # Keep only patients who have values for the outcome, sleep measure
+    # and every possible adjustment variable.
+    #
+    # Using one fixed dataset ensures that changes in AIC are caused by
+    # changes in the predictors, not by changes in the patients included.
+    model_data <- key_variables[
+      complete.cases(key_variables[, required_vars]),
+      required_vars
+    ]
+    
+    # Create the full model.
+    # It contains the sleep measure and all demographic and clinical variables.
+    full_formula <- reformulate(
+      termlabels = c(
+        sleep_var,
+        covariate_names
+      ),
+      response = qol_var
+    )
+    
+    # Create the smallest model that is allowed.
+    # The sleep measure must remain because it is the main variable needed
+    # to answer Question 2.
+    minimum_formula <- reformulate(
+      termlabels = sleep_var,
+      response = qol_var
+    )
+    
+    # Fit the full linear regression model.
+    full_model <- lm(
+      full_formula,
+      data = model_data
+    )
+    
+    # Start with the full model and remove adjustment variables one at a time.
+    # stepAIC() keeps a smaller model when removing variables improves or
+    # sufficiently maintains its AIC.
+    #
+    # The sleep measure cannot be removed because it is included in the
+    # minimum model.
+    selected_model <- MASS::stepAIC(
+      full_model,
+      scope = list(
+        lower = minimum_formula,
+        upper = full_formula
+      ),
+      direction = "backward",
+      trace = FALSE
+    )
+    
+    # Give the model a clear name, such as SF36_PCS_PSQI.
+    model_name <- paste(
+      qol_var,
+      sleep_var,
+      sep = "_"
+    )
+    
+    # Save the full model, selected model and data used.
+    # We will need these later for results and assumption checks.
+    selected_qol_models[[model_name]] <- list(
+      Full_Model = full_model,
+      Selected_Model = selected_model,
+      Model_Data = model_data
+    )
+    
+    # Identify the predictors remaining in the selected model.
+    selected_terms <- attr(
+      terms(selected_model),
+      "term.labels"
+    )
+    
+    # Add a row describing this model to the summary table.
+    selection_summary <- rbind(
+      selection_summary,
+      data.frame(
+        Model = model_name,
+        
+        # Number of patients used in the model.
+        Complete_Case_N = nrow(model_data),
+        
+        # Number of predictors before backward selection.
+        Full_Terms = length(
+          attr(terms(full_model), "term.labels")
+        ),
+        
+        # Number of predictors remaining afterward.
+        Selected_Terms = length(selected_terms),
+        
+        # Tutorial 9 used N/15 as a guide for the allowed model size.
+        N_Divided_By_15 = round(
+          nrow(model_data) / 15,
+          2
+        ),
+        
+        # TRUE means the selected model meets the Tutorial 9 guideline.
+        Meets_Term_Rule =
+          length(selected_terms) < (nrow(model_data) / 15),
+        
+        # Record AIC before and after selection.
+        # A lower AIC indicates a preferable balance between fit and complexity.
+        Full_AIC = round(AIC(full_model), 2),
+        Selected_AIC = round(AIC(selected_model), 2),
+        
+        # Show the final model formula so we know which variables remained.
+        Selected_Formula = paste(
+          deparse(formula(selected_model)),
+          collapse = " "
+        ),
+        
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+}
+
+print(selection_summary)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 11: SUMMARIZE THE ADJUSTED SLEEP-QOL RELATIONSHIPS
+# ------------------------------------------------------------------------------
+
+# Create an empty table for the results from the eight selected models.
+adjusted_sleep_results <- data.frame()
+
+for (sleep_var in primary_sleep_vars) {
+  
+  for (qol_var in qol_vars) {
+    
+    # Recreate the name used to save the model in Section 10.
+    model_name <- paste(
+      qol_var,
+      sleep_var,
+      sep = "_"
+    )
+    
+    # Retrieve the full and selected versions of this model.
+    full_model <- selected_qol_models[[model_name]]$Full_Model
+    
+    selected_model <- selected_qol_models[[model_name]]$Selected_Model
+    
+    # Extract the regression coefficients from the selected model.
+    coefficient_table <- summary(selected_model)$coefficients
+    
+    # Obtain the 95% confidence interval for the sleep coefficient.
+    sleep_confidence_interval <- confint(
+      selected_model
+    )[sleep_var, ]
+    
+    # Compare the smaller selected model with the original full model.
+    # A p-value above 0.05 suggests that removing the excluded variables
+    # did not make the selected model significantly worse.
+    model_comparison <- anova(
+      selected_model,
+      full_model
+    )
+    
+    # Add the main sleep result from this model to the results table.
+    adjusted_sleep_results <- rbind(
+      adjusted_sleep_results,
+      data.frame(
+        Model = model_name,
+        QoL_Outcome = qol_var,
+        Sleep_Variable = sleep_var,
+        
+        # Number of complete patients used in the model.
+        N = nobs(selected_model),
+        
+        # Expected change in QoL associated with the sleep measure,
+        # after adjustment for the variables retained in the model.
+        Adjusted_Estimate = unname(
+          coefficient_table[sleep_var, "Estimate"]
+        ),
+        
+        # Estimated uncertainty around the adjusted coefficient.
+        Standard_Error = unname(
+          coefficient_table[sleep_var, "Std. Error"]
+        ),
+        
+        # Lower and upper limits of the 95% confidence interval.
+        CI_Lower = unname(
+          sleep_confidence_interval[1]
+        ),
+        
+        CI_Upper = unname(
+          sleep_confidence_interval[2]
+        ),
+        
+        # P-value testing whether the adjusted sleep coefficient is zero.
+        P_Value = unname(
+          coefficient_table[sleep_var, "Pr(>|t|)"]
+        ),
+        
+        # Proportion of QoL variation explained by the selected model,
+        # adjusted for the number of predictors.
+        Adjusted_R_Squared =
+          summary(selected_model)$adj.r.squared,
+        
+        # P-value comparing the selected model with the full model.
+        Full_vs_Selected_P =
+          model_comparison$`Pr(>F)`[2],
+        
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+}
+
+# Reset the row labels to simple numbers.
+rownames(adjusted_sleep_results) <- NULL
+
+# Adjust the eight sleep-effect p-values using the Holm method from Tutorial 9.
+adjusted_sleep_results$Holm_P <- p.adjust(
+  adjusted_sleep_results$P_Value,
+  method = "holm"
+)
+
+# Round estimates, standard errors, confidence intervals and adjusted R-squared
+# after completing all calculations.
+columns_to_round <- c(
+  "Adjusted_Estimate",
+  "Standard_Error",
+  "CI_Lower",
+  "CI_Upper",
+  "Adjusted_R_Squared"
+)
+
+adjusted_sleep_results[columns_to_round] <- round(
+  adjusted_sleep_results[columns_to_round],
+  3
+)
+
+# Create readable versions of the original sleep-effect p-values.
+adjusted_sleep_results$P_Value_Display <- ifelse(
+  adjusted_sleep_results$P_Value < 0.0001,
+  "<0.0001",
+  formatC(
+    adjusted_sleep_results$P_Value,
+    format = "f",
+    digits = 4
+  )
+)
+
+# Create readable versions of the Holm-adjusted p-values.
+adjusted_sleep_results$Holm_P_Display <- ifelse(
+  adjusted_sleep_results$Holm_P < 0.0001,
+  "<0.0001",
+  formatC(
+    adjusted_sleep_results$Holm_P,
+    format = "f",
+    digits = 4
+  )
+)
+
+# Create readable p-values for the selected-versus-full model comparisons.
+adjusted_sleep_results$Model_Comparison_P_Display <- ifelse(
+  adjusted_sleep_results$Full_vs_Selected_P < 0.0001,
+  "<0.0001",
+  formatC(
+    adjusted_sleep_results$Full_vs_Selected_P,
+    format = "f",
+    digits = 4
+  )
+)
+
+# Select the results needed for the final summary table.
+adjusted_sleep_table <- adjusted_sleep_results[, c(
+  "Model",
+  "N",
+  "Adjusted_Estimate",
+  "Standard_Error",
+  "CI_Lower",
+  "CI_Upper",
+  "Adjusted_R_Squared",
+  "P_Value_Display",
+  "Holm_P_Display",
+  "Model_Comparison_P_Display"
+)]
+
+# Ensure the final table also has simple row numbers.
+rownames(adjusted_sleep_table) <- NULL
+
+print(adjusted_sleep_table)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 12: CHECK THE LINEAR REGRESSION ASSUMPTIONS
+# ------------------------------------------------------------------------------
+
+# Tutorial 6 examined three main diagnostic plots:
+# 1. Histogram of residuals
+# 2. Residuals plotted against fitted values
+# 3. Normal Q-Q plot of residuals
+#
+# These plots will be produced separately for each of the eight selected models.
+
+for (model_name in names(selected_qol_models)) {
+  
+  # Retrieve the selected model.
+  selected_model <- selected_qol_models[[model_name]]$Selected_Model
+  
+  # Extract its residuals and fitted values.
+  model_residuals <- resid(selected_model)
+  model_fitted_values <- fitted(selected_model)
+  
+  # Display three diagnostic plots for this model.
+  par(
+    mfrow = c(1, 3),
+    mar = c(4, 4, 3, 1)
+  )
+  
+  # Plot 1: Histogram of residuals.
+  # The residuals should be reasonably centred around zero and should not
+  # show extreme skewness.
+  hist(
+    model_residuals,
+    main = paste("Residuals:", model_name),
+    xlab = "Residual",
+    ylab = "Frequency",
+    col = "lightblue",
+    border = "white"
+  )
+  
+  # Add a vertical line at zero to show the expected residual centre.
+  abline(
+    v = 0,
+    col = "red",
+    lwd = 2,
+    lty = 2
+  )
+  
+  # Plot 2: Residuals against fitted values.
+  # We look for a random scatter around zero without a curve or funnel shape.
+  plot(
+    model_fitted_values,
+    model_residuals,
+    main = paste("Residuals vs Fitted:", model_name),
+    xlab = "Fitted Values",
+    ylab = "Residuals",
+    pch = 19,
+    col = rgb(0.2, 0.4, 0.7, 0.5)
+  )
+  
+  # Add a horizontal reference line at zero.
+  abline(
+    h = 0,
+    col = "red",
+    lwd = 2,
+    lty = 2
+  )
+  
+  # Plot 3: Normal Q-Q plot.
+  # Points close to the reference line support approximate residual normality.
+  qqnorm(
+    model_residuals,
+    main = paste("Normal Q-Q:", model_name),
+    pch = 19,
+    col = rgb(0.2, 0.4, 0.7, 0.5)
+  )
+  
+  qqline(
+    model_residuals,
+    col = "red",
+    lwd = 2
+  )
+}
+
+# Return to the normal plotting layout and margins.
+par(
+  mfrow = c(1, 1),
+  mar = c(5.1, 4.1, 4.1, 2.1)
+)
+
+# ------------------------------------------------------------------------------
+# Q2 SECTION 13: CHECK MULTICOLLINEARITY USING VIF
+# ------------------------------------------------------------------------------
+
+# Install the car package only if it is not already installed.
+# This prevents R from reinstalling it every time the script is run.
+if (!requireNamespace("car", quietly = TRUE)) {
+  install.packages(
+    "car",
+    dependencies = TRUE
+  )
+}
+
+# Load the package after confirming it is installed.
+library(car)
+
+# Create an empty table to store VIF results from every selected model.
+vif_results <- data.frame()
+
+for (model_name in names(selected_qol_models)) {
+  
+  # Retrieve the selected model.
+  selected_model <- selected_qol_models[[model_name]]$Selected_Model
+  
+  # Calculate VIF values for the predictors in this model.
+  model_vif <- car::vif(selected_model)
+  
+  # Factors with several categories may produce generalized VIF values.
+  if (is.matrix(model_vif)) {
+    
+    # Use the adjusted generalized VIF so factors with different numbers
+    # of categories can be compared.
+    if ("GVIF^(1/(2*Df))" %in% colnames(model_vif)) {
+      
+      vif_values <- model_vif[, "GVIF^(1/(2*Df))"]
+      
+    } else {
+      
+      vif_values <- model_vif[, "GVIF"]^(
+        1 / (2 * model_vif[, "Df"])
+      )
+    }
+    
+  } else {
+    
+    # Ordinary VIF values are returned when each predictor uses one coefficient.
+    vif_values <- model_vif
+  }
+  
+  # Add this model's results to the combined table.
+  vif_results <- rbind(
+    vif_results,
+    data.frame(
+      Model = model_name,
+      Predictor = names(vif_values),
+      VIF = as.numeric(vif_values),
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+# Round the VIF values for presentation.
+vif_results$VIF <- round(
+  vif_results$VIF,
+  3
+)
+
+# Add a general interpretation guide.
+vif_results$Interpretation <- ifelse(
+  vif_results$VIF < 5,
+  "No major concern",
+  ifelse(
+    vif_results$VIF < 10,
+    "Review carefully",
+    "High multicollinearity"
+  )
+)
+
+# Reset the table row numbers.
+rownames(vif_results) <- NULL
+
+print(vif_results)
+
+# ============================================================
+# Q2 SECTION 14: ADJUSTED MODELS USING CLINICAL THRESHOLDS
+# ============================================================
+
+# The primary adjusted models treated PSQI, ESS, and AIS as continuous scores.
+# This sensitivity analysis converts them into clinical sleep-disturbance groups:
+# PSQI > 4, ESS > 10, and AIS > 5.
+#
+# We keep the same adjustment variables selected in Section 10.
+# This lets us examine the effect of changing how sleep disturbance is measured,
+# without allowing a second variable-selection procedure to change the model.
+
+# Store the clinically accepted cutoff for each sleep questionnaire.
+clinical_cutoffs <- c(
+  PSQI = 4,
+  ESS  = 10,
+  AIS  = 5
+)
+
+# Only PSQI, ESS, and AIS need to be converted.
+# BSS is not included here because it is already binary.
+sensitivity_model_names <- c(
+  "SF36_PCS_PSQI", "SF36_MCS_PSQI",
+  "SF36_PCS_ESS",  "SF36_MCS_ESS",
+  "SF36_PCS_AIS",  "SF36_MCS_AIS"
+)
+
+# Create an empty list to store the six fitted sensitivity models.
+binary_sensitivity_models <- list()
+
+# Create an empty results table.
+binary_sensitivity_results <- data.frame()
+
+for (model_name in sensitivity_model_names) {
+  
+  # Retrieve the selected continuous-score model from Section 10.
+  continuous_model <- selected_qol_models[[model_name]]$Selected_Model
+  
+  # Retrieve the exact complete-case dataset used for that model.
+  # This keeps the continuous and binary versions based on the same patients.
+  model_data <- selected_qol_models[[model_name]]$Model_Data
+  
+  # Identify the sleep questionnaire from the model name.
+  if (grepl("PSQI$", model_name)) {
+    sleep_variable <- "PSQI"
+  } else if (grepl("ESS$", model_name)) {
+    sleep_variable <- "ESS"
+  } else {
+    sleep_variable <- "AIS"
+  }
+  
+  # Name the new binary exposure variable.
+  binary_variable <- paste0(sleep_variable, "_binary")
+  
+  # Create the clinical disturbance indicator:
+  # 0 = not disturbed
+  # 1 = disturbed
+  #
+  # The assignment specifies values ABOVE the cutoff, so the code uses ">".
+  model_data[[binary_variable]] <- as.integer(
+    model_data[[sleep_variable]] > clinical_cutoffs[sleep_variable]
+  )
+  
+  # Extract the outcome and predictors from the selected continuous model.
+  outcome_variable <- all.vars(formula(continuous_model))[1]
+  selected_predictors <- attr(
+    terms(continuous_model),
+    "term.labels"
+  )
+  
+  # Replace the continuous sleep score with its binary clinical version.
+  sensitivity_predictors <- selected_predictors
+  sensitivity_predictors[
+    sensitivity_predictors == sleep_variable
+  ] <- binary_variable
+  
+  # Build the sensitivity-model formula.
+  sensitivity_formula <- reformulate(
+    termlabels = sensitivity_predictors,
+    response = outcome_variable
+  )
+  
+  # Fit an adjusted linear regression using the clinical sleep group.
+  sensitivity_model <- lm(
+    formula = sensitivity_formula,
+    data = model_data
+  )
+  
+  # Save the fitted model in case we need its full output later.
+  binary_sensitivity_models[[model_name]] <- sensitivity_model
+  
+  # Extract the disturbed-versus-not-disturbed coefficient.
+  coefficient_table <- summary(sensitivity_model)$coefficients
+  binary_row <- coefficient_table[binary_variable, ]
+  
+  # Calculate its 95% confidence interval.
+  binary_ci <- confint(
+    sensitivity_model,
+    parm = binary_variable,
+    level = 0.95
+  )
+  
+  # Count patients in each clinical sleep group.
+  n_not_disturbed <- sum(model_data[[binary_variable]] == 0)
+  n_disturbed <- sum(model_data[[binary_variable]] == 1)
+  
+  # Add the results from this model to the combined table.
+  binary_sensitivity_results <- rbind(
+    binary_sensitivity_results,
+    data.frame(
+      Model = model_name,
+      Outcome = outcome_variable,
+      Sleep_Measure = sleep_variable,
+      N = nobs(sensitivity_model),
+      N_Not_Disturbed = n_not_disturbed,
+      N_Disturbed = n_disturbed,
+      Adjusted_Mean_Difference = unname(binary_row["Estimate"]),
+      Standard_Error = unname(binary_row["Std. Error"]),
+      CI_Lower = unname(binary_ci[1]),
+      CI_Upper = unname(binary_ci[2]),
+      P_Value = unname(binary_row["Pr(>|t|)"]),
+      Adjusted_R_Squared = summary(sensitivity_model)$adj.r.squared,
+      stringsAsFactors = FALSE
+    )
+  )
+}
+
+# Adjust the six p-values using Holm's method.
+# This accounts for testing three sleep measures against two QoL outcomes.
+binary_sensitivity_results$Holm_P <- p.adjust(
+  binary_sensitivity_results$P_Value,
+  method = "holm"
+)
+
+# Make a copy for clean display without changing the original values.
+binary_sensitivity_table <- binary_sensitivity_results
+
+# Round the numerical results used in the report.
+columns_to_round <- c(
+  "Adjusted_Mean_Difference",
+  "Standard_Error",
+  "CI_Lower",
+  "CI_Upper",
+  "Adjusted_R_Squared"
+)
+
+binary_sensitivity_table[columns_to_round] <- round(
+  binary_sensitivity_table[columns_to_round],
+  3
+)
+
+# Display very small p-values as <0.0001 instead of incorrectly showing 0.
+format_p_value <- function(p) {
+  ifelse(
+    p < 0.0001,
+    "<0.0001",
+    formatC(p, format = "f", digits = 4)
+  )
+}
+
+binary_sensitivity_table$P_Value_Display <- format_p_value(
+  binary_sensitivity_table$P_Value
+)
+
+binary_sensitivity_table$Holm_P_Display <- format_p_value(
+  binary_sensitivity_table$Holm_P
+)
+
+# Keep only the report-relevant columns.
+binary_sensitivity_table <- binary_sensitivity_table[
+  c(
+    "Model",
+    "N",
+    "N_Not_Disturbed",
+    "N_Disturbed",
+    "Adjusted_Mean_Difference",
+    "Standard_Error",
+    "CI_Lower",
+    "CI_Upper",
+    "Adjusted_R_Squared",
+    "P_Value_Display",
+    "Holm_P_Display"
+  )
+]
+
+# Remove automatic row names so the printed table is clean.
+rownames(binary_sensitivity_table) <- NULL
+
+print(binary_sensitivity_table)
