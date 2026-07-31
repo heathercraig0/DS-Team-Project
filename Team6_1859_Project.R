@@ -112,7 +112,7 @@ continuous_summary <- data.frame(
   Variable = continuous_vars,
   Mean     = round(mean_vals, 2),
   SD       = round(sd_vals, 2),
-  Median   = round(meCI fordian_vals, 2),
+  Median   = round(median_vals, 2),
   IQR      = round(iqr_vals, 2),
   Missing  = na_vals,
   N_valid  = nrow(key_variables) - na_vals
