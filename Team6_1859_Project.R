@@ -176,7 +176,8 @@ print(categorical_summary)
 # Q1 Prevalence for each of the 4 sleep instruments and overall
 # ----------------------------------------------------------------------------
 # Prevalence of each of the instruments
-# Denominator = No + Yes (i.e. Not Total since Missing is excluded from the denominator)
+# Denominator = No + Yes 
+# (i.e. Not Total since Missing is excluded from the denominator)
 # Using binom.test() for 95% CI.
 
 # --- PSQI ---
@@ -219,7 +220,8 @@ prevalence_table <- data.frame(
 print(prevalence_table)
 
 # Overall (composite) prevalence
-# A subject classified as "disturbed" if >=50% of their COMPLETED sleep instruments flagged disturbance. 
+# A subject classified as "disturbed" if >=50% of their COMPLETED sleep 
+# instruments flagged disturbance. 
 # Denominator per subject = number of instruments they actually completed
 # (missing instruments are excluded, not counted as "not disturbed").
 
@@ -285,13 +287,15 @@ key_variables$Depression <- factor(key_variables$Depression,
 key_variables$Corticosteroid <- factor(key_variables$Corticosteroid, 
                                        labels = c("No", "Yes"))
 
-# Restricting the Number of Predictors;  LiverDiagnosis has 5 levels = 4 DoF, all other categorical and continuous predictors contribute 1 DoF
+# Restricting the Number of Predictors;  LiverDiagnosis has 5 levels = 4 DoF, 
+# all other categorical and continuous predictors contribute 1 DoF
 # Total candidate predictor DoF = 14.
 
 # PSQI Model  - Linear Regression w Stepwise Backward Model Selection
 # ----------------------------------------------------------------------------
 library(MASS)
-#Max DoF is 12 (183/15 = 12.2), so LiverDiagnosis was removed to reduce the candidate model from 14 to 10 DoF.# Removing missing data 
+# Max DoF is 12 (183/15 = 12.2), so LiverDiagnosis was removed to reduce the 
+# candidate model from 14 to 10 DoF.# Removing missing data 
 PSQI_data <- na.omit(key_variables[, c(
   "PSQI",
   "Age",
