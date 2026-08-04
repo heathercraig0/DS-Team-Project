@@ -486,22 +486,10 @@ primary_sleep_vars <- c("PSQI", "ESS", "AIS", "BSS")
 
 # These clinically defined binary variables will be used later for secondary
 # comparisons between disturbed and non-disturbed patients.
-binary_sleep_vars <- c(
-  "PSQI_binary",
-  "ESS_binary",
-  "AIS_binary",
-  "BSS"
-)
+binary_sleep_vars <- c("PSQI_binary","ESS_binary","AIS_binary","BSS")
 
 # Select the variables needed for the initial Question 2 data check.
-q2_variables <- c(
-  "SF36_PCS",
-  "SF36_MCS",
-  "PSQI",
-  "ESS",
-  "AIS",
-  "BSS"
-)
+q2_variables <- c("SF36_PCS", "SF36_MCS", "PSQI", "ESS", "AIS", "BSS")
 
 # Verify that the selected variables have the expected data types and values.
 str(key_variables[q2_variables])
