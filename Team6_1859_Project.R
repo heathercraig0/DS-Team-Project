@@ -292,7 +292,6 @@ key_variables$Corticosteroid <- factor(key_variables$Corticosteroid,
 # Total candidate predictor DoF = 14.
 
 # PSQI Model  - Linear Regression w Stepwise Backward Model Selection
-# ----------------------------------------------------------------------------
 library(MASS)
 # Max DoF is 12 (183/15 = 12.2), so LiverDiagnosis was removed to reduce the 
 # candidate model from 14 to 10 DoF.# Removing missing data 
@@ -324,7 +323,6 @@ summary(PSQI_stepback_model)
 
 
 # ESS Model  - Linear Regression w Stepwise Backward Model Selection
-# ----------------------------------------------------------------------------
 # All 14 candidate predictor DoF can be included in the initial full model
 ESS_data <- na.omit(key_variables[, c(
   "ESS",
@@ -353,7 +351,6 @@ summary(ESS_stepback_model)
 
 
 # AIS Model  - Linear Regression w Stepwise Backward Model Selection
-# ----------------------------------------------------------------------------
 # All 14 candidate predictor DoF can be included in the initial full model
 AIS_data <- na.omit(key_variables[, c(
   "AIS",
@@ -382,7 +379,6 @@ summary(AIS_stepback_model)
 
 
 # BSS Model  - Logistic Regression w Stepwise Backward Model Selection
-# ----------------------------------------------------------------------------
 # Max predictor DoF is 6 (102/15=6.8) so need to remove
 BSS_data <- na.omit(key_variables[, c(
   "BSS",
@@ -412,7 +408,6 @@ round(exp(coef(BSS_stepback_model)), 3)
 
 
 # Overall Disturbance Model  - Logistic Regression w Stepwise Backward Model Selection
-# ----------------------------------------------------------------------------
 # Max 8 DoF (123/15), so need to remove some predictors for full model
 Composite_data <- na.omit(key_variables[, c(
   "Sleep_disturbed_composite",
@@ -452,7 +447,6 @@ nrow(Composite_data)
 
 # Summary: predictor significance
 # ----------------------------------------------------------------------------
-
 psqi_coef <- round(summary(PSQI_stepback_model)$coefficients, 3)
 print(psqi_coef)
 
@@ -471,11 +465,6 @@ composite_coef <- round(summary(Composite_stepback_model)$coefficients, 3)
 print(composite_coef)
 composite_or <- round(exp(coef(Composite_stepback_model)), 3)
 print(composite_or)
-
-
-#sorry i have this here it was just easier for me to visualize, Ill remove before we submit - HC
-write.csv(key_variables, "key_variables.csv", row.names = FALSE)
-
 
 
 # ----------------------------------------------------------------------------
@@ -651,6 +640,7 @@ abline(
 
 # Return the graphics window to the normal one-plot layout.
 par(mfrow = c(1, 1))
+
 # ------------------------------------------------------------------------------
 # Q2 SECTION 5: VISUALIZE CONTINUOUS SLEEP SCORES AND QUALITY OF LIFE
 # ------------------------------------------------------------------------------
@@ -1621,9 +1611,9 @@ rownames(vif_results) <- NULL
 
 print(vif_results)
 
-# ============================================================
+# ------------------------------------------------------------------------------
 # Q2 SECTION 14: ADJUSTED MODELS USING CLINICAL THRESHOLDS
-# ============================================================
+# ------------------------------------------------------------------------------
 
 # The primary adjusted models treated PSQI, ESS, and AIS as continuous scores.
 # This sensitivity analysis converts them into clinical sleep-disturbance groups:
