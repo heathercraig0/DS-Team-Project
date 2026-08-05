@@ -554,32 +554,6 @@ for (sleep_var in primary_sleep_vars) {
 
 print(pair_sample_sizes)
 
-# ------------------------------------------------------------------------------
-# Q2 SECTION 3: DESCRIBE PHYSICAL AND MENTAL QUALITY OF LIFE
-# ------------------------------------------------------------------------------
-
-# Create a function to calculate the main descriptive statistics for each
-# quality-of-life outcome.
-summarize_qol <- function(x) {
-  data.frame(
-    Valid_n = sum(!is.na(x)),
-    Missing_n = sum(is.na(x)),
-    Mean = round(mean(x, na.rm = TRUE), 2),
-    SD = round(sd(x, na.rm = TRUE), 2),
-    Median = round(median(x, na.rm = TRUE), 2),
-    IQR = round(IQR(x, na.rm = TRUE), 2),
-    Minimum = round(min(x, na.rm = TRUE), 2),
-    Maximum = round(max(x, na.rm = TRUE), 2)
-  )
-}
-
-# Apply the function separately to physical and mental quality of life.
-qol_summary <- rbind(
-  SF36_PCS = summarize_qol(key_variables$SF36_PCS),
-  SF36_MCS = summarize_qol(key_variables$SF36_MCS)
-)
-
-print(qol_summary)
 
 # ------------------------------------------------------------------------------
 # Q2 SECTION 4: EXAMINE THE DISTRIBUTIONS OF PCS AND MCS
